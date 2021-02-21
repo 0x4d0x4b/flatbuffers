@@ -774,7 +774,6 @@ CheckedError Parser::ParseField(StructDef &struct_def) {
     ECHECK(AddField(struct_def, name + UnionTypeFieldSuffix(),
                     type.enum_def->underlying_type, &typefield));
   } else if (IsVector(type) && type.element == BASE_TYPE_UNION) {
-    // Only cpp, js and ts supports the union vector feature so far.
     if (!SupportsAdvancedUnionFeatures()) {
       return Error(
           "Vectors of unions are not yet supported in at least one of "
@@ -2443,7 +2442,7 @@ bool Parser::SupportsAdvancedUnionFeatures() const {
          (opts.lang_to_generate &
           ~(IDLOptions::kCpp | IDLOptions::kTs | IDLOptions::kPhp |
             IDLOptions::kJava | IDLOptions::kCSharp | IDLOptions::kKotlin |
-            IDLOptions::kBinary | IDLOptions::kSwift)) == 0;
+            IDLOptions::kBinary | IDLOptions::kSwift | IDLOptions::kRust)) == 0;
 }
 
 bool Parser::SupportsAdvancedArrayFeatures() const {
