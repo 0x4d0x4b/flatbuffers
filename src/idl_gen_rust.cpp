@@ -2096,8 +2096,12 @@ class RustGenerator : public BaseGenerator {
         case ftVectorOfUnionValue: {
           MapNativeTableField(
               field,
-              "let w: Vec<_> = x.iter().map(|t| t.pack(_fbb).unwrap()).collect();"
-              "_fbb.create_vector(&w)");
+              "let w: Vec<_> = x.iter().map(|t|"
+              " match t.pack(_fbb) {"
+              " Some(o) => o,"
+              " None => flatbuffers::WIPOffset::new(0u32),"
+              "}).collect();"
+              " _fbb.create_vector(&w)");
           return;
         }
       }
