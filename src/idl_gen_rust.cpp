@@ -191,6 +191,11 @@ bool IsOptionalToBuilder(const FieldDef &field) {
   return field.IsOptional() || !IsScalar(field.value.type.base_type);
 }
 
+bool IsUnionKey(const FieldDef &field) {
+  const FullType full_type = GetFullType(field.value.type);
+  return full_type == ftUnionKey || full_type == ftVectorOfUnionKey;
+}
+
 namespace rust {
 
 class RustGenerator : public BaseGenerator {
@@ -938,6 +943,11 @@ class RustGenerator : public BaseGenerator {
         return "INVALID_CODE_GENERATION";
       }
 
+      case ftVectorOfUnionValue:
+      case ftVectorOfUnionKey: {
+        return "None";
+      }
+
       case ftVectorOfBool:
       case ftVectorOfFloat:
       case ftVectorOfInteger:
@@ -945,8 +955,6 @@ class RustGenerator : public BaseGenerator {
       case ftVectorOfStruct:
       case ftVectorOfTable:
       case ftVectorOfEnumKey:
-      case ftVectorOfUnionValue:
-      case ftVectorOfUnionKey:
       case ftStruct:
       case ftTable: {
         // We only support empty vectors which matches the defaults for
@@ -1066,6 +1074,7 @@ class RustGenerator : public BaseGenerator {
         ty = "Box<" + NamespacedNativeName(*type.struct_def) + ">";
         break;
       }
+      case ftVectorOfUnionKey:
       case ftUnionKey: {
         // There is no native "UnionKey", natively, unions are rust enums with
         // newtype-struct-variants.
@@ -1080,10 +1089,6 @@ class RustGenerator : public BaseGenerator {
         break;
       }
       // Vectors are in tables and are optional
-      case ftVectorOfUnionKey: {
-        ty = "Option<Vec<" + WrapInNameSpace(*type.VectorType().enum_def) + ">>";
-        break;
-      }
       case ftVectorOfEnumKey: {
         ty = "Vec<" + WrapInNameSpace(*type.VectorType().enum_def) + ">";
         break;
@@ -1659,7 +1664,7 @@ class RustGenerator : public BaseGenerator {
       });
       code_ += "      {{OBJECT_NAME}} {";
       ForAllObjectTableFields(struct_def, [&](const FieldDef &field) {
-        if (field.value.type.base_type == BASE_TYPE_UTYPE) return;
+        if (IsUnionKey(field)) return;
         code_ += "        {{FIELD_NAME}},";
       });
       code_ += "      }";
@@ -1792,14 +1797,11 @@ class RustGenerator : public BaseGenerator {
     // Escape newline and insert it onthe next line so we can end the builder
     // with a nice semicolon.
     ForAllTableFields(struct_def, [&](const FieldDef &field) {
-      const FullType full_field_value_type = GetFullType(field.value.type);
-      // Union keys are handled alonside union values
-      if (full_field_value_type == ftUnionKey || full_field_value_type == ftVectorOfUnionKey) {
-        return;
-      }
+      // Union keys are handled alongside union values
+      if (IsUnionKey(field)) return;
 
       // TODO Implement verification for ftVectorOfUnionValue
-      if (full_field_value_type == ftVectorOfUnionValue) {
+      if (GetFullType(field.value.type) == ftVectorOfUnionValue) {
         return;
       }
 
@@ -1988,7 +1990,7 @@ class RustGenerator : public BaseGenerator {
     ForAllObjectTableFields(table, [&](const FieldDef &field) {
       // Union objects combine both the union discriminant and value, so we
       // skip making a field for the discriminant.
-      if (field.value.type.base_type == BASE_TYPE_UTYPE) return;
+      if (IsUnionKey(field)) return;
       code_ += "  pub {{FIELD_NAME}}: {{FIELD_OBJECT_TYPE}},";
     });
     code_ += "}";
@@ -1997,7 +1999,7 @@ class RustGenerator : public BaseGenerator {
     code_ += "  fn default() -> Self {";
     code_ += "    Self {";
     ForAllObjectTableFields(table, [&](const FieldDef &field) {
-      if (field.value.type.base_type == BASE_TYPE_UTYPE) return;
+      if (IsUnionKey(field)) return;
       std::string default_value = GetDefaultValue(field, kObject);
       code_ += "      {{FIELD_NAME}}: " + default_value + ",";
     });
@@ -2061,7 +2063,6 @@ class RustGenerator : public BaseGenerator {
           MapNativeTableField(field, "x.pack(_fbb)");
           return;
         }
-        case ftVectorOfUnionKey:
         case ftVectorOfEnumKey:
         case ftVectorOfInteger:
         case ftVectorOfBool:
@@ -2093,7 +2094,21 @@ class RustGenerator : public BaseGenerator {
               "_fbb.create_vector(&w)");
           return;
         }
+        case ftVectorOfUnionKey: return;
         case ftVectorOfUnionValue: {
+          code_ += "    let {{FIELD_NAME}}_type = self.{{FIELD_NAME}}.as_ref().map(|x|{";
+          code_ += "      let w: Vec<_> = x.iter().map(|t| t.payload_type()).collect();";
+          code_ += "      _fbb.create_vector(&w)";
+          code_ += "    });";
+          MapNativeTableField(
+              field,
+              "let w: Vec<_> = x.iter().map(|t|"
+              " match t.pack(_fbb) {"
+              " Some(o) => o,"
+              " None => flatbuffers::WIPOffset::new(0u32),"
+              "}).collect();"
+              " _fbb.create_vector(&w)");
+          return;
           MapNativeTableField(
               field,
               "let w: Vec<_> = x.iter().map(|t|"
