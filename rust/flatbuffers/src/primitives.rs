@@ -121,6 +121,7 @@ impl<'a, T: 'a> WIPOffset<T> {
     /// Return a wrapped value that brings its meaning as a union WIPOffset
     /// into the type system.
     #[inline(always)]
+    #[deprecated(since = "2.0.0", note = "Deprecated in favor of TaggedWIPOffset.")]
     pub fn as_union_value(self) -> WIPOffset<UnionWIPOffset> {
         WIPOffset::new(self.0)
     }
@@ -242,6 +243,24 @@ impl<T> Push for BackwardsSOffset<T> {
     fn push(&self, dst: &mut [u8], rest: &[u8]) {
         self.value().push(dst, rest);
     }
+}
+
+pub trait TaggedUnion {
+    type Tag;
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct TaggedWIPOffset<T: TaggedUnion>(pub T::Tag, pub WIPOffset<T>);
+
+pub trait TagUnionValueOffset<T>: Sized + TaggedUnion {
+    fn from_value_offset(o: WIPOffset<T>) -> TaggedWIPOffset<Self>;
+}
+
+#[macro_export]
+macro_rules! union_value_offsets {
+   ( $union_name:ty $(, $value_offset:ident)* ) => {
+       [ $(<$union_name>::from_value_offset($value_offset), )* ]
+    };
 }
 
 /// SkipSizePrefix is used by Follow to traverse a FlatBuffer: the pointer is

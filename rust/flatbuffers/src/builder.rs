@@ -355,6 +355,41 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
         self.create_vector(&offsets[..])
     }
 
+    /// Create a vector of union values offsets.
+    #[inline]
+    pub fn create_vector_of_unions<'a: 'b, 'b, T: TaggedUnion + 'b>(
+        &'a mut self,
+        items: &'b [TaggedWIPOffset<T>],
+    ) -> (
+        WIPOffset<Vector<'fbb, T::Tag>>,
+        WIPOffset<Vector<'fbb, ForwardsUOffset<T>>>,
+    )
+    where
+        T::Tag: Sized + Push + Copy + Clone,
+    {
+        // TODO: iterate through items once inserting at two offsets in the owned buffer at the same time
+        let elem_size = WIPOffset::<T>::size();
+        self.align(
+            items.len() * elem_size,
+            WIPOffset::<T>::alignment().max_of(SIZE_UOFFSET),
+        );
+        for i in (0..items.len()).rev() {
+            self.push(items[i].1);
+        }
+        let values_offsets = WIPOffset::new(self.push::<UOffsetT>(items.len() as UOffsetT).value());
+
+        let discriminant_size = T::Tag::size();
+        self.align(
+            items.len() * discriminant_size,
+            T::Tag::alignment().max_of(SIZE_UOFFSET),
+        );
+        for i in (0..items.len()).rev() {
+            self.push(items[i].0);
+        }
+        let tags_offsets = WIPOffset::new(self.push::<UOffsetT>(items.len() as UOffsetT).value());
+        (tags_offsets, values_offsets)
+    }
+
     /// Create a vector of Push-able objects.
     ///
     /// Speed-sensitive users may wish to reduce memory usage by creating the
