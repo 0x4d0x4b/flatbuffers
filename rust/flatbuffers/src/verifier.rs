@@ -1,5 +1,8 @@
 use crate::follow::Follow;
-use crate::{ForwardsUOffset, SOffsetT, SkipSizePrefix, UOffsetT, VOffsetT, Vector, SIZE_UOFFSET};
+use crate::{
+    ForwardsUOffset, SOffsetT, SkipSizePrefix, TaggedUnion, UOffsetT, VOffsetT, Vector,
+    SIZE_UOFFSET,
+};
 use std::ops::Range;
 use thiserror::Error;
 
@@ -39,8 +42,10 @@ pub enum InvalidFlatbuffer {
         required: &'static str,
         error_trace: ErrorTrace,
     },
-    #[error("Union exactly one of union discriminant (`{field_type}`) and value \
-             (`{field}`) are present.\n{error_trace}")]
+    #[error(
+        "Union exactly one of union discriminant (`{field_type}`) and value \
+             (`{field}`) are present.\n{error_trace}"
+    )]
     InconsistentUnion {
         field: &'static str,
         field_type: &'static str,
@@ -70,8 +75,10 @@ pub enum InvalidFlatbuffer {
         range: Range<usize>,
         error_trace: ErrorTrace,
     },
-    #[error("Signed offset at position {position} has value {soffset} which points out of bounds.\
-             \n{error_trace}")]
+    #[error(
+        "Signed offset at position {position} has value {soffset} which points out of bounds.\
+             \n{error_trace}"
+    )]
     SignedOffsetOutOfBounds {
         soffset: SOffsetT,
         position: usize,
@@ -400,20 +407,16 @@ impl<'ver, 'opts, 'buf> TableVerifier<'ver, 'opts, 'buf> {
     /// Union verification is complicated. The schemas passes this function the metadata of the
     /// union's key (discriminant) and value fields, and a callback. The function verifies and
     /// reads the key, then invokes the callback to perform data-dependent verification.
-    pub fn visit_union<Key, UnionVerifier>(
+    pub fn visit_union<T: TaggedUnion + UnionVerifiable<'buf>>(
         mut self,
         key_field_name: &'static str,
         key_field_voff: VOffsetT,
         val_field_name: &'static str,
         val_field_voff: VOffsetT,
         required: bool,
-        verify_union: UnionVerifier,
     ) -> Result<Self>
     where
-        Key: Follow<'buf> + Verifiable,
-        UnionVerifier:
-            (std::ops::FnOnce(<Key as Follow<'buf>>::Inner, &mut Verifier, usize) -> Result<()>),
-        // NOTE: <Key as Follow<'buf>>::Inner == Key
+        T::Tag: Follow<'buf> + Verifiable,
     {
         // TODO(caspern): how to trace vtable errors?
         let val_pos = self.deref(val_field_voff)?;
@@ -427,10 +430,10 @@ impl<'ver, 'opts, 'buf> TableVerifier<'ver, 'opts, 'buf> {
                 }
             }
             (Some(k), Some(v)) => {
-                trace_field(Key::run_verifier(self.verifier, k), key_field_name, k)?;
-                let discriminant = Key::follow(self.verifier.buffer, k);
+                trace_field(T::Tag::run_verifier(self.verifier, k), key_field_name, k)?;
+                let discriminant = T::Tag::follow(self.verifier.buffer, k);
                 trace_field(
-                    verify_union(discriminant, self.verifier, v),
+                    T::run_union_verifier(self.verifier, discriminant, v),
                     val_field_name,
                     v,
                 )?;
@@ -461,6 +464,19 @@ impl<T: Verifiable> Verifiable for ForwardsUOffset<T> {
         let next_pos = offset.saturating_add(pos);
         T::run_verifier(v, next_pos)
     }
+}
+
+pub trait UnionVerifiable<'a>: TaggedUnion
+where
+    <Self as TaggedUnion>::Tag: Follow<'a>,
+{
+    /// Runs a verifier for a union type, assuming it is at position `pos` in the verifier's buffer.
+    /// Should not need to be called directly.
+    fn run_union_verifier(
+        v: &mut Verifier,
+        tag: <<Self as TaggedUnion>::Tag as Follow<'a>>::Inner,
+        pos: usize,
+    ) -> Result<()>;
 }
 
 /// Checks and returns the range containing the flatbuffers vector.

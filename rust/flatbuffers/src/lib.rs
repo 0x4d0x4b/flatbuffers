@@ -50,8 +50,8 @@ pub use crate::push::Push;
 pub use crate::table::{buffer_has_identifier, Table};
 pub use crate::vector::{follow_cast_ref, SafeSliceAccess, Vector, VectorIter};
 pub use crate::verifier::{
-    ErrorTraceDetail, InvalidFlatbuffer, SimpleToVerifyInSlice, Verifiable, Verifier,
-    VerifierOptions,
+    ErrorTraceDetail, InvalidFlatbuffer, SimpleToVerifyInSlice, UnionVerifiable, Verifiable,
+    Verifier, VerifierOptions,
 };
 pub use crate::vtable::field_index_to_field_offset;
 pub use bitflags;

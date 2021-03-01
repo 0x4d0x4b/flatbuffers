@@ -804,7 +804,7 @@ class RustGenerator : public BaseGenerator {
 
   void GenUnionTraits(const EnumDef &enum_def) {
     code_ += "impl flatbuffers::TaggedUnion for {{UNION_OFFSET_NAME}} {";
-    code_ += "  type Tag = Payload;";
+    code_ += "  type Tag = {{NAME}};";
     code_ += "}";
     code_ += "";
     ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
@@ -817,6 +817,25 @@ class RustGenerator : public BaseGenerator {
       code_ += "}";
       code_ += "";
     });
+    code_ += "impl<'a> flatbuffers::UnionVerifiable<'a> for {{UNION_OFFSET_NAME}} {";
+    code_ += "  fn run_union_verifier(";
+    code_ += "    v: &mut flatbuffers::Verifier,";
+    code_ += "    tag: <<Self as flatbuffers::TaggedUnion>::Tag as flatbuffers::Follow<'a>>::Inner,";
+    code_ += "    pos: usize,";
+    code_ += "  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {";
+    code_ += "    match tag {";
+    ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
+      code_ += "      {{NAME}}::{{VARIANT_NAME}} => v";
+      code_ += "        .verify_union_variant::<flatbuffers::ForwardsUOffset<{{VARIANT_NAME}}>>(";
+      code_ += "          \"{{NAME}}::{{VARIANT_NAME}}\",";
+      code_ += "          pos,";
+      code_ += "        ),";
+    });
+    code_ += "      _ => Ok(()),";
+    code_ += "    }";
+    code_ += "  }";
+    code_ += "}";
+    code_ += "";
   }
 
   void GenUnionObject(const EnumDef &enum_def) {
@@ -1843,23 +1862,12 @@ class RustGenerator : public BaseGenerator {
       }
       // Unions.
       EnumDef &union_def = *field.value.type.enum_def;
-      code_.SetValue("UNION_TYPE", WrapInNameSpace(union_def));
+      code_.SetValue("UNION_OFFSET_NAME", UnionOffsetName(union_def));
       code_ +=
-          "\n     .visit_union::<{{UNION_TYPE}}, _>("
+          "\n     .visit_union::<{{UNION_OFFSET_NAME}}>("
           "&\"{{FIELD_NAME}}_type\", Self::{{OFFSET_NAME}}_TYPE, "
-          "&\"{{FIELD_NAME}}\", Self::{{OFFSET_NAME}}, {{IS_REQ}}, "
-          "|key, v, pos| {";
-      code_ += "        match key {";
-      ForAllUnionVariantsBesidesNone(union_def, [&](const EnumVal &unused) {
-        (void)unused;
-        code_ +=
-            "          {{U_ELEMENT_ENUM_TYPE}} => v.verify_union_variant::"
-            "<flatbuffers::ForwardsUOffset<{{U_ELEMENT_TABLE_TYPE}}>>("
-            "\"{{U_ELEMENT_ENUM_TYPE}}\", pos),";
-      });
-      code_ += "          _ => Ok(()),";
-      code_ += "        }";
-      code_ += "     })?\\";
+          "&\"{{FIELD_NAME}}\", Self::{{OFFSET_NAME}}, {{IS_REQ}}, ";
+      code_ += "     )?\\";
     });
     code_ += "\n     .finish();";
     code_ += "    Ok(())";
@@ -2123,8 +2131,10 @@ class RustGenerator : public BaseGenerator {
         }
         case ftVectorOfUnionKey: return;
         case ftVectorOfUnionValue: {
+          code_.SetValue("SNAKE_CASE_ENUM_NAME",
+                         MakeSnakeCase(Name(*field.value.type.enum_def)));
           code_ += "    let {{FIELD_NAME}}_type = self.{{FIELD_NAME}}.as_ref().map(|x|{";
-          code_ += "      let w: Vec<_> = x.iter().map(|t| t.payload_type()).collect();";
+          code_ += "      let w: Vec<_> = x.iter().map(|t| t.{{SNAKE_CASE_ENUM_NAME}}_type()).collect();";
           code_ += "      _fbb.create_vector(&w)";
           code_ += "    });";
           MapNativeTableField(
