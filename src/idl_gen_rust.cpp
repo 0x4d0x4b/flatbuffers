@@ -1846,13 +1846,11 @@ class RustGenerator : public BaseGenerator {
       // Union keys are handled alongside union values
       if (IsUnionKey(field)) return;
 
-      // TODO Implement verification for ftVectorOfUnionValue
-      if (GetFullType(field.value.type) == ftVectorOfUnionValue) {
-        return;
-      }
-
       code_.SetValue("IS_REQ", field.IsRequired() ? "true" : "false");
-      if (GetFullType(field.value.type) != ftUnionValue) {
+
+      const auto field_value_type = GetFullType(field.value.type);
+      if (field_value_type != ftUnionValue &&
+          field_value_type != ftVectorOfUnionValue) {
         // All types besides unions.
         code_.SetValue("TY", FollowType(field.value.type, "'_"));
         code_ +=
@@ -1863,8 +1861,10 @@ class RustGenerator : public BaseGenerator {
       // Unions.
       EnumDef &union_def = *field.value.type.enum_def;
       code_.SetValue("UNION_OFFSET_NAME", UnionOffsetName(union_def));
+      code_.SetValue("UNION_VISIT_SUFFIX",
+          field_value_type == ftVectorOfUnionValue ? "_vector" : "");
       code_ +=
-          "\n     .visit_union::<{{UNION_OFFSET_NAME}}>("
+          "\n     .visit_union{{UNION_VISIT_SUFFIX}}::<{{UNION_OFFSET_NAME}}>("
           "&\"{{FIELD_NAME}}_type\", Self::{{OFFSET_NAME}}_TYPE, "
           "&\"{{FIELD_NAME}}\", Self::{{OFFSET_NAME}}, {{IS_REQ}}, ";
       code_ += "     )?\\";

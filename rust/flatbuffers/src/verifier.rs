@@ -51,6 +51,26 @@ pub enum InvalidFlatbuffer {
         field_type: &'static str,
         error_trace: ErrorTrace,
     },
+    #[error(
+        "Only one of discriminants (`{field_type}`) and values \
+             (`{field}`) fields is present.\n{error_trace}"
+    )]
+    InconsistentUnionVector {
+        field: &'static str,
+        field_type: &'static str,
+        error_trace: ErrorTrace,
+    },
+    #[error(
+        "Number of discriminants in (`{field_type}`) and values \
+             in (`{field}`) do not match.\n{error_trace}"
+    )]
+    UnionVectorCountMismatch {
+        field: &'static str,
+        field_type: &'static str,
+        keys_count: usize,
+        vals_count: usize,
+        error_trace: ErrorTrace,
+    },
     #[error("Utf8 error for string in {range:?}: {error}\n{error_trace}")]
     Utf8Error {
         #[source]
@@ -144,6 +164,30 @@ impl InvalidFlatbuffer {
             error_trace: Default::default(),
         })
     }
+    fn new_inconsistent_union_vector<T>(
+        field: &'static str,
+        field_type: &'static str,
+    ) -> Result<T> {
+        Err(Self::InconsistentUnionVector {
+            field,
+            field_type,
+            error_trace: Default::default(),
+        })
+    }
+    fn new_union_vector_count_mismatch<T>(
+        field: &'static str,
+        field_type: &'static str,
+        keys_count: usize,
+        vals_count: usize,
+    ) -> Result<T> {
+        Err(Self::UnionVectorCountMismatch {
+            field,
+            field_type,
+            keys_count,
+            vals_count,
+            error_trace: Default::default(),
+        })
+    }
     fn new_missing_required<T>(required: &'static str) -> Result<T> {
         Err(Self::MissingRequiredField {
             required,
@@ -160,6 +204,8 @@ fn append_trace<T>(mut res: Result<T>, d: ErrorTraceDetail) -> Result<T> {
         | Unaligned { error_trace, .. }
         | RangeOutOfBounds { error_trace, .. }
         | InconsistentUnion { error_trace, .. }
+        | InconsistentUnionVector { error_trace, .. }
+        | UnionVectorCountMismatch { error_trace, .. }
         | Utf8Error { error_trace, .. }
         | MissingNullTerminator { error_trace, .. }
         | SignedOffsetOutOfBounds { error_trace, .. } = e
@@ -403,10 +449,11 @@ impl<'ver, 'opts, 'buf> TableVerifier<'ver, 'opts, 'buf> {
             Ok(self)
         }
     }
+
     #[inline]
-    /// Union verification is complicated. The schemas passes this function the metadata of the
-    /// union's key (discriminant) and value fields, and a callback. The function verifies and
-    /// reads the key, then invokes the callback to perform data-dependent verification.
+    /// Union verification is complicated. Schemas pass this function the metadata of the
+    /// union's key (discriminant) and value fields. The function verifies and
+    /// reads the key, then invokes the trait function to perform data-dependent verification.
     pub fn visit_union<T: TaggedUnion + UnionVerifiable<'buf>>(
         mut self,
         key_field_name: &'static str,
@@ -442,6 +489,85 @@ impl<'ver, 'opts, 'buf> TableVerifier<'ver, 'opts, 'buf> {
             _ => InvalidFlatbuffer::new_inconsistent_union(key_field_name, val_field_name),
         }
     }
+
+    #[inline]
+    /// Union vector verification is complicated. Schemas pass this function the metadata of the
+    /// union's keys (discriminants) and values fields. For each item the function verifies and
+    /// reads the key, then invokes the trait function to perform data-dependent verification.
+    pub fn visit_union_vector<T: TaggedUnion + UnionVerifiable<'buf>>(
+        mut self,
+        keys_vec_field_name: &'static str,
+        keys_vec_field_voff: VOffsetT,
+        vals_vec_field_name: &'static str,
+        vals_vec_field_voff: VOffsetT,
+        required: bool,
+    ) -> Result<Self>
+    where
+        T::Tag: Follow<'buf> + Verifiable,
+    {
+        let keys_vec_pos = self.deref(keys_vec_field_voff)?;
+        let vals_vec_pos = self.deref(vals_vec_field_voff)?;
+        match (keys_vec_pos, vals_vec_pos) {
+            (None, None) => {
+                if required {
+                    InvalidFlatbuffer::new_missing_required(vals_vec_field_name)
+                } else {
+                    Ok(self)
+                }
+            }
+            (Some(k), Some(v)) => {
+                let keys_offset = self.verifier.get_uoffset(k)? as usize;
+                let keys_pos = keys_offset.saturating_add(k);
+                let keys_range = trace_field(
+                    verify_vector_range::<T::Tag>(self.verifier, keys_pos),
+                    keys_vec_field_name,
+                    keys_pos,
+                )?;
+
+                let vals_offset = self.verifier.get_uoffset(v)? as usize;
+                let vals_pos = vals_offset.saturating_add(v);
+                let vals_range = trace_field(
+                    verify_vector_range::<ForwardsUOffset<T>>(self.verifier, vals_pos),
+                    vals_vec_field_name,
+                    vals_pos,
+                )?;
+
+                let key_size = std::mem::size_of::<T::Tag>();
+                let val_size = std::mem::size_of::<ForwardsUOffset<T>>();
+
+                let keys_count = keys_range.len() / key_size;
+                let vals_count = vals_range.len() / val_size;
+
+                if keys_count != vals_count {
+                    return InvalidFlatbuffer::new_union_vector_count_mismatch(
+                        keys_vec_field_name,
+                        vals_vec_field_name,
+                        keys_count,
+                        vals_count,
+                    );
+                }
+
+                keys_range
+                    .step_by(key_size)
+                    .zip(vals_range.step_by(val_size))
+                    .fold(Ok(self), |result, kv| match result {
+                        Ok(verifier) => verifier.visit_union::<T>(
+                            keys_vec_field_name,
+                            kv.0 as u16,
+                            vals_vec_field_name,
+                            kv.1 as u16,
+                            false,
+                        ),
+                        Err(err) => Err(err),
+                    })
+            }
+            _ => InvalidFlatbuffer::new_inconsistent_union_vector(
+                keys_vec_field_name,
+                vals_vec_field_name,
+            ),
+        }
+    }
+
     pub fn finish(self) -> &'ver mut Verifier<'opts, 'buf> {
         self.verifier.depth -= 1;
         self.verifier
