@@ -22,7 +22,8 @@ extern crate flatbuffers;
 #[path = "./monster_generated.rs"]
 #[allow(clippy::approx_constant)]  // We use low precision PI as a default value.
 mod monster_generated;
-pub use monster_generated::my_game::sample::{Color, Equipment,
+use flatbuffers::TagUnionValueOffset;
+pub use monster_generated::my_game::sample::{Color, Equipment, EquipmentUnionTableOffset,
                                              Monster, MonsterArgs,
                                              Vec3,
                                              Weapon, WeaponArgs};
@@ -49,6 +50,7 @@ fn main() {
       name: Some(weapon_two_name),
       damage: 5,
   });
+  let axe_as_union = EquipmentUnionTableOffset::from_value_offset(axe);
 
   // Name of the Monster.
   let name = builder.create_string("Orc");
@@ -81,8 +83,8 @@ fn main() {
       inventory: Some(inventory),
       color: Color::Red,
       weapons: Some(weapons),
-      equipped_type: Equipment::Weapon,
-      equipped: Some(axe.as_union_value()),
+      equipped_type: axe_as_union.tag,
+      equipped: Some(axe_as_union.value),
       //path: Some(path),
       ..Default::default()
   });

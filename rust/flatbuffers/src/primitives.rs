@@ -245,24 +245,6 @@ impl<T> Push for BackwardsSOffset<T> {
     }
 }
 
-pub trait TaggedUnion {
-    type Tag;
-}
-
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub struct TaggedWIPOffset<T: TaggedUnion>(pub T::Tag, pub WIPOffset<T>);
-
-pub trait TagUnionValueOffset<T>: Sized + TaggedUnion {
-    fn from_value_offset(o: WIPOffset<T>) -> TaggedWIPOffset<Self>;
-}
-
-#[macro_export]
-macro_rules! union_value_offsets {
-   ( $union_name:ty $(, $value_offset:ident)* ) => {
-       [ $(<$union_name>::from_value_offset($value_offset), )* ]
-    };
-}
-
 /// SkipSizePrefix is used by Follow to traverse a FlatBuffer: the pointer is
 /// incremented by a fixed constant in order to skip over the size prefix value.
 pub struct SkipSizePrefix<T>(PhantomData<T>);

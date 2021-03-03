@@ -35,6 +35,7 @@ mod get_root;
 mod primitives;
 mod push;
 mod table;
+mod union;
 mod vector;
 mod verifier;
 mod vtable;
@@ -48,6 +49,7 @@ pub use crate::follow::{Follow, FollowStart};
 pub use crate::primitives::*;
 pub use crate::push::Push;
 pub use crate::table::{buffer_has_identifier, Table};
+pub use crate::union::*;
 pub use crate::vector::{follow_cast_ref, SafeSliceAccess, Vector, VectorIter};
 pub use crate::verifier::{
     ErrorTraceDetail, InvalidFlatbuffer, SimpleToVerifyInSlice, UnionVerifiable, Verifiable,

@@ -26,6 +26,7 @@ use crate::endian_scalar::{emplace_scalar, read_scalar_at};
 use crate::primitives::*;
 use crate::push::{Push, PushAlignment};
 use crate::table::Table;
+use crate::union::*;
 use crate::vector::{SafeSliceAccess, Vector};
 use crate::vtable::{field_index_to_field_offset, VTable};
 use crate::vtable_writer::VTableWriter;
@@ -360,10 +361,7 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
     pub fn create_vector_of_unions<'a: 'b, 'b, T: TaggedUnion + 'b>(
         &'a mut self,
         items: &'b [TaggedWIPOffset<T>],
-    ) -> (
-        WIPOffset<Vector<'fbb, T::Tag>>,
-        WIPOffset<Vector<'fbb, ForwardsUOffset<T>>>,
-    )
+    ) -> TaggedVectorWIPOffset<'fbb, T>
     where
         T::Tag: Sized + Push + Copy + Clone,
     {
@@ -374,7 +372,7 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
             WIPOffset::<T>::alignment().max_of(SIZE_UOFFSET),
         );
         for i in (0..items.len()).rev() {
-            self.push(items[i].1);
+            self.push(items[i].value);
         }
         let values_offsets = WIPOffset::new(self.push::<UOffsetT>(items.len() as UOffsetT).value());
 
@@ -384,10 +382,13 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
             T::Tag::alignment().max_of(SIZE_UOFFSET),
         );
         for i in (0..items.len()).rev() {
-            self.push(items[i].0);
+            self.push(items[i].tag);
         }
         let tags_offsets = WIPOffset::new(self.push::<UOffsetT>(items.len() as UOffsetT).value());
-        (tags_offsets, values_offsets)
+        TaggedVectorWIPOffset {
+            tags: tags_offsets,
+            values: values_offsets,
+        }
     }
 
     /// Create a vector of Push-able objects.

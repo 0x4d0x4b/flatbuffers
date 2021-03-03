@@ -7,7 +7,7 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::EndianScalar;
+use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
 
 #[allow(unused_imports, dead_code)]
 pub mod my_game {
@@ -17,7 +17,7 @@ pub mod my_game {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::EndianScalar;
+  use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
 #[allow(unused_imports, dead_code)]
 pub mod other_name_space {
 
@@ -26,7 +26,7 @@ pub mod other_name_space {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::EndianScalar;
+  use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
 
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_FROM_INCLUDE: i64 = 0;
@@ -108,6 +108,7 @@ impl<'a> flatbuffers::Verifiable for FromInclude {
 }
 
 impl flatbuffers::SimpleToVerifyInSlice for FromInclude {}
+
 // struct Unused, aligned to 4
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Default)]

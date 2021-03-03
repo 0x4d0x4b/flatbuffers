@@ -596,7 +596,8 @@ pub trait UnionVerifiable<'a>: TaggedUnion
 where
     <Self as TaggedUnion>::Tag: Follow<'a>,
 {
-    /// Runs a verifier for a union type, assuming it is at position `pos` in the verifier's buffer.
+    /// Runs a verifier for a union type,
+    /// assuming it is at position `pos` in the verifier's buffer.
     /// Should not need to be called directly.
     fn run_union_verifier(
         v: &mut Verifier,

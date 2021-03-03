@@ -6,7 +6,7 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::EndianScalar;
+use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
 
 #[allow(unused_imports, dead_code)]
 pub mod my_game {
@@ -15,7 +15,7 @@ pub mod my_game {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::EndianScalar;
+  use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
 #[allow(unused_imports, dead_code)]
 pub mod sample {
 
@@ -23,7 +23,7 @@ pub mod sample {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::EndianScalar;
+  use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
 
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_COLOR: i8 = 0;
@@ -113,6 +113,7 @@ impl<'a> flatbuffers::Verifiable for Color {
 }
 
 impl flatbuffers::SimpleToVerifyInSlice for Color {}
+
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_EQUIPMENT: u8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
@@ -197,7 +198,37 @@ impl<'a> flatbuffers::Verifiable for Equipment {
 }
 
 impl flatbuffers::SimpleToVerifyInSlice for Equipment {}
+
 pub struct EquipmentUnionTableOffset {}
+
+impl flatbuffers::TaggedUnion for EquipmentUnionTableOffset {
+  type Tag = Equipment;
+}
+
+impl<'a> flatbuffers::TagUnionValueOffset<Weapon<'a>> for EquipmentUnionTableOffset {
+  fn from_value_offset(
+    o: flatbuffers::WIPOffset<Weapon<'a>>,
+  ) -> flatbuffers::TaggedWIPOffset<Self> {
+    flatbuffers::TaggedWIPOffset{ tag: Equipment::Weapon, value: flatbuffers::WIPOffset::new(o.value()) }
+  }
+}
+
+impl<'a> flatbuffers::UnionVerifiable<'a> for EquipmentUnionTableOffset {
+  fn run_union_verifier(
+    v: &mut flatbuffers::Verifier,
+    tag: <<Self as flatbuffers::TaggedUnion>::Tag as flatbuffers::Follow<'a>>::Inner,
+    pos: usize,
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    match tag {
+      Equipment::Weapon => v
+        .verify_union_variant::<flatbuffers::ForwardsUOffset<Weapon>>(
+          "Equipment::Weapon",
+          pos,
+        ),
+      _ => Ok(()),
+    }
+  }
+}
 
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq)]
@@ -217,10 +248,10 @@ impl EquipmentT {
       Self::Weapon(_) => Equipment::Weapon,
     }
   }
-  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder) -> Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>> {
+  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder) -> Option<flatbuffers::WIPOffset<EquipmentUnionTableOffset>> {
     match self {
       Self::NONE => None,
-      Self::Weapon(v) => Some(v.pack(fbb).as_union_value()),
+      Self::Weapon(v) => Some(EquipmentUnionTableOffset::from_value_offset(v.pack(fbb)).value),
     }
   }
   /// If the union variant matches, return the owned WeaponT, setting the union to NONE.
@@ -569,12 +600,8 @@ impl flatbuffers::Verifiable for Monster<'_> {
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(&"inventory", Self::VT_INVENTORY, false)?
      .visit_field::<Color>(&"color", Self::VT_COLOR, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<Weapon>>>>(&"weapons", Self::VT_WEAPONS, false)?
-     .visit_union::<Equipment, _>(&"equipped_type", Self::VT_EQUIPPED_TYPE, &"equipped", Self::VT_EQUIPPED, false, |key, v, pos| {
-        match key {
-          Equipment::Weapon => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Weapon>>("Equipment::Weapon", pos),
-          _ => Ok(()),
-        }
-     })?
+     .visit_union::<EquipmentUnionTableOffset>(&"equipped_type", Self::VT_EQUIPPED_TYPE, &"equipped", Self::VT_EQUIPPED, false,
+     )?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, Vec3>>>(&"path", Self::VT_PATH, false)?
      .finish();
     Ok(())
@@ -589,7 +616,7 @@ pub struct MonsterArgs<'a> {
     pub color: Color,
     pub weapons: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Weapon<'a>>>>>,
     pub equipped_type: Equipment,
-    pub equipped: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub equipped: Option<flatbuffers::WIPOffset<EquipmentUnionTableOffset>>,
     pub path: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, Vec3>>>,
 }
 impl<'a> Default for MonsterArgs<'a> {
@@ -647,7 +674,7 @@ impl<'a: 'b, 'b> MonsterBuilder<'a, 'b> {
     self.fbb_.push_slot::<Equipment>(Monster::VT_EQUIPPED_TYPE, equipped_type, Equipment::NONE);
   }
   #[inline]
-  pub fn add_equipped(&mut self, equipped: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+  pub fn add_equipped(&mut self, equipped: flatbuffers::WIPOffset<EquipmentUnionTableOffset>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Monster::VT_EQUIPPED, equipped);
   }
   #[inline]

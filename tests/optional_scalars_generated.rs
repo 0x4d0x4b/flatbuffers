@@ -6,7 +6,7 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::EndianScalar;
+use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
 
 #[allow(unused_imports, dead_code)]
 pub mod optional_scalars {
@@ -15,7 +15,7 @@ pub mod optional_scalars {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::EndianScalar;
+  use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
 
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_OPTIONAL_BYTE: i8 = 0;
@@ -105,6 +105,7 @@ impl<'a> flatbuffers::Verifiable for OptionalByte {
 }
 
 impl flatbuffers::SimpleToVerifyInSlice for OptionalByte {}
+
 pub enum ScalarStuffOffset {}
 #[derive(Copy, Clone, PartialEq)]
 

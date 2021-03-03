@@ -15,6 +15,7 @@
  */
 
 use bencher::Bencher;
+use flatbuffers::TagUnionValueOffset;
 
 #[allow(dead_code, unused_imports)]
 #[path = "../../include_test/include_test1_generated.rs"]
@@ -106,22 +107,22 @@ fn create_serialized_example_with_generated_code(
             my_game::example::Color::Green,
             &my_game::example::Test::new(5i16, 6i8),
         );
+        let monster_as_union = my_game::example::AnyUnionTableOffset::from_value_offset(
+            my_game::example::Monster::create(
+                builder,
+                &my_game::example::MonsterArgs {
+                    name: Some(fred_name),
+                    ..Default::default()
+                },
+            ),
+        );
         let args = my_game::example::MonsterArgs {
             hp: 80,
             mana: 150,
             name: Some(name),
             pos: Some(&pos),
-            test_type: my_game::example::Any::Monster,
-            test: Some(
-                my_game::example::Monster::create(
-                    builder,
-                    &my_game::example::MonsterArgs {
-                        name: Some(fred_name),
-                        ..Default::default()
-                    },
-                )
-                .as_union_value(),
-            ),
+            test_type: monster_as_union.tag,
+            test: Some(monster_as_union.value),
             inventory: Some(inventory),
             test4: Some(test4),
             testarrayofstring: Some(builder.create_vector(&[s0, s1])),
@@ -148,7 +149,7 @@ fn blackbox<T>(t: T) -> T {
 
 #[inline(always)]
 fn traverse_serialized_example_with_generated_code(bytes: &[u8]) {
-    let m = my_game::example::get_root_as_monster(bytes);
+    let m = my_game::example::root_as_monster(bytes).unwrap();
     blackbox(m.hp());
     blackbox(m.mana());
     blackbox(m.name());

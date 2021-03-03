@@ -16,6 +16,8 @@
 
 // independent from idl_parser, since this code is not needed for most clients
 
+#include <unordered_set>
+
 #include "flatbuffers/code_generators.h"
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/idl.h"
@@ -443,7 +445,7 @@ class RustGenerator : public BaseGenerator {
   std::string Name(const EnumVal &ev) const { return EscapeKeyword(ev.name); }
 
   std::string UnionOffsetName(const EnumDef &enum_def) {
-    return Name(enum_def) + "UnionTableOffset";
+    return WrapInNameSpace(enum_def) + "UnionTableOffset";
   }
 
   std::string WrapInNameSpace(const Definition &def) const {
@@ -807,12 +809,19 @@ class RustGenerator : public BaseGenerator {
     code_ += "  type Tag = {{NAME}};";
     code_ += "}";
     code_ += "";
-    ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
-      code_ += "impl<'a> flatbuffers::TagUnionValueOffset<{{VARIANT_NAME}}<'a>> for {{UNION_OFFSET_NAME}} {";
+    std::unordered_set<std::string> already_seen;
+    ForAllUnionVariantsBesidesNone(enum_def, [&](const EnumVal &unused) {
+      (void)unused;
+      const std::string u_element_table_type = code_.GetValue("U_ELEMENT_TABLE_TYPE");
+      if (already_seen.find(u_element_table_type) != already_seen.cend()) {
+        return;
+      }
+      already_seen.emplace(u_element_table_type);
+      code_ += "impl<'a> flatbuffers::TagUnionValueOffset<{{U_ELEMENT_TABLE_TYPE}}<'a>> for {{UNION_OFFSET_NAME}} {";
       code_ += "  fn from_value_offset(";
-      code_ += "    o: flatbuffers::WIPOffset<{{VARIANT_NAME}}<'a>>,";
+      code_ += "    o: flatbuffers::WIPOffset<{{U_ELEMENT_TABLE_TYPE}}<'a>>,";
       code_ += "  ) -> flatbuffers::TaggedWIPOffset<Self> {";
-      code_ += "    flatbuffers::TaggedWIPOffset({{NAME}}::{{VARIANT_NAME}}, flatbuffers::WIPOffset::new(o.value()))";
+      code_ += "    flatbuffers::TaggedWIPOffset{ tag: {{U_ELEMENT_ENUM_TYPE}}, value: flatbuffers::WIPOffset::new(o.value()) }";
       code_ += "  }";
       code_ += "}";
       code_ += "";
@@ -824,10 +833,11 @@ class RustGenerator : public BaseGenerator {
     code_ += "    pos: usize,";
     code_ += "  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {";
     code_ += "    match tag {";
-    ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
-      code_ += "      {{NAME}}::{{VARIANT_NAME}} => v";
-      code_ += "        .verify_union_variant::<flatbuffers::ForwardsUOffset<{{VARIANT_NAME}}>>(";
-      code_ += "          \"{{NAME}}::{{VARIANT_NAME}}\",";
+    ForAllUnionVariantsBesidesNone(enum_def, [&](const EnumVal &unused) {
+      (void)unused;
+      code_ += "      {{U_ELEMENT_ENUM_TYPE}} => v";
+      code_ += "        .verify_union_variant::<flatbuffers::ForwardsUOffset<{{U_ELEMENT_TABLE_TYPE}}>>(";
+      code_ += "          \"{{U_ELEMENT_ENUM_TYPE}}\",";
       code_ += "          pos,";
       code_ += "        ),";
     });
@@ -884,7 +894,7 @@ class RustGenerator : public BaseGenerator {
     ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
       code_ +=
           "      Self::{{NATIVE_VARIANT}}(v) => "
-          "Some({{UNION_OFFSET_NAME}}::from_value_offset(v.pack(fbb)).1),";
+          "Some({{UNION_OFFSET_NAME}}::from_value_offset(v.pack(fbb)).value),";
     });
     code_ += "    }";
     code_ += "  }";
@@ -1866,7 +1876,7 @@ class RustGenerator : public BaseGenerator {
       code_ +=
           "\n     .visit_union{{UNION_VISIT_SUFFIX}}::<{{UNION_OFFSET_NAME}}>("
           "&\"{{FIELD_NAME}}_type\", Self::{{OFFSET_NAME}}_TYPE, "
-          "&\"{{FIELD_NAME}}\", Self::{{OFFSET_NAME}}, {{IS_REQ}}, ";
+          "&\"{{FIELD_NAME}}\", Self::{{OFFSET_NAME}}, {{IS_REQ}},";
       code_ += "     )?\\";
     });
     code_ += "\n     .finish();";
