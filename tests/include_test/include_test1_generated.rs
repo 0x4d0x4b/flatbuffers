@@ -7,7 +7,7 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
+use self::flatbuffers::{EndianScalar, TaggedUnion};
 
 pub enum TableAOffset {}
 #[derive(Copy, Clone, PartialEq)]

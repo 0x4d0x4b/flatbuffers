@@ -6,7 +6,7 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
+use self::flatbuffers::{EndianScalar, TaggedUnion};
 
 #[allow(unused_imports, dead_code)]
 pub mod namespace_a {
@@ -15,7 +15,7 @@ pub mod namespace_a {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
+  use self::flatbuffers::{EndianScalar, TaggedUnion};
 #[allow(unused_imports, dead_code)]
 pub mod namespace_b {
 
@@ -23,7 +23,7 @@ pub mod namespace_b {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
+  use self::flatbuffers::{EndianScalar, TaggedUnion};
 
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_UNION_IN_NESTED_NS: u8 = 0;
@@ -58,6 +58,14 @@ impl UnionInNestedNS {
       _ => None,
     }
   }
+
+  #[inline]
+  pub fn tag_as_table_in_nested_ns(
+    o: flatbuffers::WIPOffset<TableInNestedNS>,
+  ) -> flatbuffers::UnionWIPOffset<UnionInNestedNSUnionValue> {
+    flatbuffers::UnionWIPOffset::new(Self::TableInNestedNS, flatbuffers::WIPOffset::new(o.value()))
+  }
+
 }
 impl std::fmt::Debug for UnionInNestedNS {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -110,21 +118,13 @@ impl<'a> flatbuffers::Verifiable for UnionInNestedNS {
 
 impl flatbuffers::SimpleToVerifyInSlice for UnionInNestedNS {}
 
-pub struct UnionInNestedNSUnionTableOffset {}
+pub struct UnionInNestedNSUnionValue {}
 
-impl flatbuffers::TaggedUnion for UnionInNestedNSUnionTableOffset {
+impl flatbuffers::TaggedUnion for UnionInNestedNSUnionValue {
   type Tag = UnionInNestedNS;
 }
 
-impl<'a> flatbuffers::TagUnionValueOffset<TableInNestedNS<'a>> for UnionInNestedNSUnionTableOffset {
-  fn from_value_offset(
-    o: flatbuffers::WIPOffset<TableInNestedNS<'a>>,
-  ) -> flatbuffers::TaggedWIPOffset<Self> {
-    flatbuffers::TaggedWIPOffset{ tag: UnionInNestedNS::TableInNestedNS, value: flatbuffers::WIPOffset::new(o.value()) }
-  }
-}
-
-impl<'a> flatbuffers::UnionVerifiable<'a> for UnionInNestedNSUnionTableOffset {
+impl<'a> flatbuffers::UnionVerifiable<'a> for UnionInNestedNSUnionValue {
   fn run_union_verifier(
     v: &mut flatbuffers::Verifier,
     tag: <<Self as flatbuffers::TaggedUnion>::Tag as flatbuffers::Follow<'a>>::Inner,
@@ -159,10 +159,10 @@ impl UnionInNestedNST {
       Self::TableInNestedNS(_) => UnionInNestedNS::TableInNestedNS,
     }
   }
-  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder) -> Option<flatbuffers::WIPOffset<UnionInNestedNSUnionTableOffset>> {
+  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder) -> Option<flatbuffers::WIPOffset<UnionInNestedNSUnionValue>> {
     match self {
       Self::NONE => None,
-      Self::TableInNestedNS(v) => Some(UnionInNestedNSUnionTableOffset::from_value_offset(v.pack(fbb)).value),
+      Self::TableInNestedNS(v) => Some(UnionInNestedNS::tag_as_table_in_nested_ns(v.pack(fbb)).value_offset()),
     }
   }
   /// If the union variant matches, return the owned TableInNestedNST, setting the union to NONE.

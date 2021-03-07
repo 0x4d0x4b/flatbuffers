@@ -444,8 +444,8 @@ class RustGenerator : public BaseGenerator {
 
   std::string Name(const EnumVal &ev) const { return EscapeKeyword(ev.name); }
 
-  std::string UnionOffsetName(const EnumDef &enum_def) {
-    return WrapInNameSpace(enum_def) + "UnionTableOffset";
+  std::string UnionOffsetType(const EnumDef &enum_def) {
+    return WrapInNameSpace(enum_def) + "UnionValue";
   }
 
   std::string WrapInNameSpace(const Definition &def) const {
@@ -708,6 +708,21 @@ class RustGenerator : public BaseGenerator {
       code_ += "      _ => None,";
       code_ += "    }";
       code_ += "  }";
+      // Generate union offset constructors
+      if (enum_def.is_union) {
+        code_.SetValue("UNION_OFFSET_TYPE", UnionOffsetType(enum_def));
+        code_ += "";
+        ForAllUnionVariantsBesidesNone(enum_def, [&](const EnumVal &unused) {
+          (void)unused;
+          code_ += "  #[inline]";
+          code_ += "  pub fn tag_as_{{U_ELEMENT_NAME}}(";
+          code_ += "    o: flatbuffers::WIPOffset<{{U_ELEMENT_TABLE_TYPE}}>,";
+          code_ += "  ) -> flatbuffers::UnionWIPOffset<{{UNION_OFFSET_TYPE}}> {";
+          code_ += "    flatbuffers::UnionWIPOffset::new(Self::{{VARIANT_NAME}}, flatbuffers::WIPOffset::new(o.value()))";
+          code_ += "  }";
+          code_ += "";
+        });
+      }
       code_ += "}";
 
       // Generate Debug. Unknown variants are printed like "<UNKNOWN 42>".
@@ -781,8 +796,8 @@ class RustGenerator : public BaseGenerator {
     if (enum_def.is_union) {
       // Generate typesafe offset(s) for unions
       code_.SetValue("NAME", Name(enum_def));
-      code_.SetValue("UNION_OFFSET_NAME", UnionOffsetName(enum_def));
-      code_ += "pub struct {{UNION_OFFSET_NAME}} {}";
+      code_.SetValue("UNION_OFFSET_TYPE", UnionOffsetType(enum_def));
+      code_ += "pub struct {{UNION_OFFSET_TYPE}} {}";
       code_ += "";
       GenUnionTraits(enum_def);
       if (parser_.opts.generate_object_based_api) { GenUnionObject(enum_def); }
@@ -797,36 +812,23 @@ class RustGenerator : public BaseGenerator {
       if (enum_val.union_type.base_type == BASE_TYPE_NONE) continue;
       code_.SetValue("VARIANT_NAME", Name(enum_val));
       code_.SetValue("NATIVE_VARIANT", MakeCamel(Name(enum_val)));
+      code_.SetValue("NATIVE_U_ELEMENT_TYPE",
+          NamespacedNativeName(*enum_val.union_type.struct_def));
       code_.SetValue("U_ELEMENT_NAME", MakeSnakeCase(Name(enum_val)));
-      code_.SetValue("U_ELEMENT_TABLE_TYPE",
-                     NamespacedNativeName(*enum_val.union_type.struct_def));
+      code_.SetValue(
+          "U_ELEMENT_TABLE_TYPE",
+          WrapInNameSpace(enum_val.union_type.struct_def->defined_namespace,
+                          enum_val.union_type.struct_def->name));
       cb();
     }
   }
 
   void GenUnionTraits(const EnumDef &enum_def) {
-    code_ += "impl flatbuffers::TaggedUnion for {{UNION_OFFSET_NAME}} {";
+    code_ += "impl flatbuffers::TaggedUnion for {{UNION_OFFSET_TYPE}} {";
     code_ += "  type Tag = {{NAME}};";
     code_ += "}";
     code_ += "";
-    std::unordered_set<std::string> already_seen;
-    ForAllUnionVariantsBesidesNone(enum_def, [&](const EnumVal &unused) {
-      (void)unused;
-      const std::string u_element_table_type = code_.GetValue("U_ELEMENT_TABLE_TYPE");
-      if (already_seen.find(u_element_table_type) != already_seen.cend()) {
-        return;
-      }
-      already_seen.emplace(u_element_table_type);
-      code_ += "impl<'a> flatbuffers::TagUnionValueOffset<{{U_ELEMENT_TABLE_TYPE}}<'a>> for {{UNION_OFFSET_NAME}} {";
-      code_ += "  fn from_value_offset(";
-      code_ += "    o: flatbuffers::WIPOffset<{{U_ELEMENT_TABLE_TYPE}}<'a>>,";
-      code_ += "  ) -> flatbuffers::TaggedWIPOffset<Self> {";
-      code_ += "    flatbuffers::TaggedWIPOffset{ tag: {{U_ELEMENT_ENUM_TYPE}}, value: flatbuffers::WIPOffset::new(o.value()) }";
-      code_ += "  }";
-      code_ += "}";
-      code_ += "";
-    });
-    code_ += "impl<'a> flatbuffers::UnionVerifiable<'a> for {{UNION_OFFSET_NAME}} {";
+    code_ += "impl<'a> flatbuffers::UnionVerifiable<'a> for {{UNION_OFFSET_TYPE}} {";
     code_ += "  fn run_union_verifier(";
     code_ += "    v: &mut flatbuffers::Verifier,";
     code_ += "    tag: <<Self as flatbuffers::TaggedUnion>::Tag as flatbuffers::Follow<'a>>::Inner,";
@@ -859,7 +861,7 @@ class RustGenerator : public BaseGenerator {
     code_ += "pub enum {{NATIVE_NAME}} {";
     code_ += "  NONE,";
     ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
-      code_ += "  {{NATIVE_VARIANT}}(Box<{{U_ELEMENT_TABLE_TYPE}}>),";
+      code_ += "  {{NATIVE_VARIANT}}(Box<{{NATIVE_U_ELEMENT_TYPE}}>),";
     });
     code_ += "}";
     // Generate Default (NONE).
@@ -887,14 +889,14 @@ class RustGenerator : public BaseGenerator {
     // Pack flatbuffers union value
     code_ +=
         "  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder)"
-        " -> Option<flatbuffers::WIPOffset<{{UNION_OFFSET_NAME}}>>"
+        " -> Option<flatbuffers::WIPOffset<{{UNION_OFFSET_TYPE}}>>"
         " {";
     code_ += "    match self {";
     code_ += "      Self::NONE => None,";
     ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
       code_ +=
           "      Self::{{NATIVE_VARIANT}}(v) => "
-          "Some({{UNION_OFFSET_NAME}}::from_value_offset(v.pack(fbb)).value),";
+          "Some({{ENUM_NAME}}::tag_as_{{U_ELEMENT_NAME}}(v.pack(fbb)).value_offset()),";
     });
     code_ += "    }";
     code_ += "  }";
@@ -904,10 +906,10 @@ class RustGenerator : public BaseGenerator {
       // Move accessor.
       code_ +=
           "  /// If the union variant matches, return the owned "
-          "{{U_ELEMENT_TABLE_TYPE}}, setting the union to NONE.";
+          "{{NATIVE_U_ELEMENT_TYPE}}, setting the union to NONE.";
       code_ +=
           "  pub fn take_{{U_ELEMENT_NAME}}(&mut self) -> "
-          "Option<Box<{{U_ELEMENT_TABLE_TYPE}}>> {";
+          "Option<Box<{{NATIVE_U_ELEMENT_TYPE}}>> {";
       code_ += "    if let Self::{{NATIVE_VARIANT}}(_) = self {";
       code_ += "      let v = std::mem::replace(self, Self::NONE);";
       code_ += "      if let Self::{{NATIVE_VARIANT}}(w) = v {";
@@ -922,10 +924,10 @@ class RustGenerator : public BaseGenerator {
       // Immutable reference accessor.
       code_ +=
           "  /// If the union variant matches, return a reference to the "
-          "{{U_ELEMENT_TABLE_TYPE}}.";
+          "{{NATIVE_U_ELEMENT_TYPE}}.";
       code_ +=
           "  pub fn as_{{U_ELEMENT_NAME}}(&self) -> "
-          "Option<&{{U_ELEMENT_TABLE_TYPE}}> {";
+          "Option<&{{NATIVE_U_ELEMENT_TYPE}}> {";
       code_ +=
           "    if let Self::{{NATIVE_VARIANT}}(v) = self "
           "{ Some(v.as_ref()) } else { None }";
@@ -933,10 +935,10 @@ class RustGenerator : public BaseGenerator {
       // Mutable reference accessor.
       code_ +=
           "  /// If the union variant matches, return a mutable reference"
-          " to the {{U_ELEMENT_TABLE_TYPE}}.";
+          " to the {{NATIVE_U_ELEMENT_TYPE}}.";
       code_ +=
           "  pub fn as_{{U_ELEMENT_NAME}}_mut(&mut self) -> "
-          "Option<&mut {{U_ELEMENT_TABLE_TYPE}}> {";
+          "Option<&mut {{NATIVE_U_ELEMENT_TYPE}}> {";
       code_ +=
           "    if let Self::{{NATIVE_VARIANT}}(v) = self "
           "{ Some(v.as_mut()) } else { None }";
@@ -1072,7 +1074,7 @@ class RustGenerator : public BaseGenerator {
       }
       case ftUnionValue: {
         return "Option<flatbuffers::WIPOffset<" +
-               UnionOffsetName(*type.enum_def) + ">>";
+               UnionOffsetType(*type.enum_def) + ">>";
       }
 
       case ftVectorOfInteger:
@@ -1098,7 +1100,7 @@ class RustGenerator : public BaseGenerator {
         return WrapUOffsetsVector("&" + lifetime + " str");
       }
       case ftVectorOfUnionValue: {
-        return WrapUOffsetsVector(UnionOffsetName(*type.enum_def));
+        return WrapUOffsetsVector(UnionOffsetType(*type.enum_def));
       }
     }
     return "INVALID_CODE_GENERATION";  // for return analysis
@@ -1211,7 +1213,7 @@ class RustGenerator : public BaseGenerator {
       case ftVectorOfUnionValue: {
         return "flatbuffers::WIPOffset<flatbuffers::Vector<" + lifetime +
                ", flatbuffers::ForwardsUOffset<" +
-               UnionOffsetName(*type.enum_def) + ">>>";
+               UnionOffsetType(*type.enum_def) + ">>>";
       }
       case ftEnumKey:
       case ftUnionKey: {
@@ -1236,7 +1238,7 @@ class RustGenerator : public BaseGenerator {
       }
       case ftUnionValue: {
         return "flatbuffers::WIPOffset<" +
-               UnionOffsetName(*type.enum_def) + ">";
+               UnionOffsetType(*type.enum_def) + ">";
       }
     }
 
@@ -1472,6 +1474,7 @@ class RustGenerator : public BaseGenerator {
       const EnumVal &ev = **it;
       // TODO(cneo): Can variants be deprecated, should we skip them?
       if (ev.union_type.base_type == BASE_TYPE_NONE) { continue; }
+      code_.SetValue("VARIANT_NAME", Name(ev));
       code_.SetValue(
           "U_ELEMENT_ENUM_TYPE",
           WrapInNameSpace(def.defined_namespace, GetEnumValue(def, ev)));
@@ -1694,7 +1697,7 @@ class RustGenerator : public BaseGenerator {
                   "                &{{ENUM_NAME}}::{{VARIANT_NAME}} => "
                   "{{NATIVE_ENUM_NAME}}::{{NATIVE_VARIANT}}(Box::new(";
               code_ +=
-                  "                    {{VARIANT_NAME}}::init_from_table(table).unpack())),";
+                  "                    {{U_ELEMENT_TABLE_TYPE}}::init_from_table(table).unpack())),";
             });
             code_ +=
                 "                _ => {{NATIVE_ENUM_NAME}}::NONE,";
@@ -1870,11 +1873,11 @@ class RustGenerator : public BaseGenerator {
       }
       // Unions.
       EnumDef &union_def = *field.value.type.enum_def;
-      code_.SetValue("UNION_OFFSET_NAME", UnionOffsetName(union_def));
+      code_.SetValue("UNION_OFFSET_TYPE", UnionOffsetType(union_def));
       code_.SetValue("UNION_VISIT_SUFFIX",
           field_value_type == ftVectorOfUnionValue ? "_vector" : "");
       code_ +=
-          "\n     .visit_union{{UNION_VISIT_SUFFIX}}::<{{UNION_OFFSET_NAME}}>("
+          "\n     .visit_union{{UNION_VISIT_SUFFIX}}::<{{UNION_OFFSET_TYPE}}>("
           "&\"{{FIELD_NAME}}_type\", Self::{{OFFSET_NAME}}_TYPE, "
           "&\"{{FIELD_NAME}}\", Self::{{OFFSET_NAME}}, {{IS_REQ}},";
       code_ += "     )?\\";
@@ -2691,7 +2694,7 @@ class RustGenerator : public BaseGenerator {
     code_ += indent + "use std::cmp::Ordering;";
     code_ += "";
     code_ += indent + "extern crate flatbuffers;";
-    code_ += indent + "use self::flatbuffers::{EndianScalar, TagUnionValueOffset};";
+    code_ += indent + "use self::flatbuffers::{EndianScalar, TaggedUnion};";
   }
 
   // Set up the correct namespace. This opens a namespace if the current

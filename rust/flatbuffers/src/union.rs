@@ -15,40 +15,63 @@
  */
 
 use crate::primitives::*;
-use crate::Vector;
+use crate::{Push, Vector};
 
-/// A trait defening a Tag type for union offsets
+/// A trait defining TaggedUnion interface
 pub trait TaggedUnion {
-    type Tag;
+    type Tag: Push<Output = Self::Tag> + Clone + Copy;
 }
 
-/// Combines a union's value offset with its tag (discriminant) value
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub struct TaggedWIPOffset<T: TaggedUnion> {
-    pub tag: T::Tag,
-    pub value: WIPOffset<T>,
+/// UnionWIPOffset marks a `WIPOffset` as being for a union value.
+pub struct UnionWIPOffset<T: TaggedUnion> {
+    tag: T::Tag,
+    value_offset: WIPOffset<T>,
+}
+
+impl<T: TaggedUnion> UnionWIPOffset<T> {
+    #[inline]
+    pub fn new(tag: T::Tag, value_offset: WIPOffset<T>) -> Self {
+        Self { tag, value_offset }
+    }
+
+    #[inline]
+    pub fn tag(&self) -> T::Tag {
+        self.tag
+    }
+
+    #[inline]
+    pub fn value_offset(&self) -> WIPOffset<T> {
+        self.value_offset
+    }
 }
 
 /// Combines a vector of unions' values offsets with a vector
-/// of their associated tags (discriminant) values
+/// of their associated tags (discriminants) values
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub struct TaggedVectorWIPOffset<'a, T: TaggedUnion> {
-    pub tags: WIPOffset<Vector<'a, T::Tag>>,
-    pub values: WIPOffset<Vector<'a, ForwardsUOffset<T>>>,
+pub struct UnionVectorWIPOffsets<'a, T: TaggedUnion> {
+    tags: WIPOffset<Vector<'a, T::Tag>>,
+    values_offset: WIPOffset<Vector<'a, ForwardsUOffset<T>>>,
 }
 
-/// A trait that is implemented by TaggedUnion to enable conversion
-/// of a value's WIPOffset to its tagged equivalent
-pub trait TagUnionValueOffset<T>: Sized + TaggedUnion {
-    fn from_value_offset(o: WIPOffset<T>) -> TaggedWIPOffset<Self>;
-}
+impl<'a, T: TaggedUnion> UnionVectorWIPOffsets<'a, T> {
+    #[inline]
+    pub fn new(
+        tags: WIPOffset<Vector<'a, T::Tag>>,
+        values_offset: WIPOffset<Vector<'a, ForwardsUOffset<T>>>,
+    ) -> Self {
+        Self {
+            tags,
+            values_offset,
+        }
+    }
 
-/// Used to create a slice of the same type TaggedWIPOffsets
-/// from a sequence of union variant offsets
-#[macro_export]
-macro_rules! union_value_offsets {
-   ( $union_name:ty $(, $value_offset:ident)* ) => {
-       [ $(<$union_name>::from_value_offset($value_offset), )* ]
-    };
-}
+    #[inline]
+    pub fn tags(&self) -> WIPOffset<Vector<'a, T::Tag>> {
+        self.tags
+    }
 
+    #[inline]
+    pub fn values_offset(&self) -> WIPOffset<Vector<'a, ForwardsUOffset<T>>> {
+        self.values_offset
+    }
+}

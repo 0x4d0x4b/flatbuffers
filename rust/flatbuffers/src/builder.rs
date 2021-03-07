@@ -254,12 +254,9 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
             // Gets The pointer to the size of the string
             let str_memory = &buf[buf.len() - ptr..];
             // Gets the size of the written string from buffer
-            let size = u32::from_le_bytes([
-                str_memory[0],
-                str_memory[1],
-                str_memory[2],
-                str_memory[3],
-            ]) as usize;
+            let size =
+                u32::from_le_bytes([str_memory[0], str_memory[1], str_memory[2], str_memory[3]])
+                    as usize;
             // Size of the string size
             let string_size: usize = 4;
             // Fetches actual string bytes from index of string after string size
@@ -360,35 +357,30 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
     #[inline]
     pub fn create_vector_of_unions<'a: 'b, 'b, T: TaggedUnion + 'b>(
         &'a mut self,
-        items: &'b [TaggedWIPOffset<T>],
-    ) -> TaggedVectorWIPOffset<'fbb, T>
-    where
-        T::Tag: Sized + Push + Copy + Clone,
-    {
-        // TODO: iterate through items once inserting at two offsets in the owned buffer at the same time
-        let elem_size = WIPOffset::<T>::size();
-        self.align(
-            items.len() * elem_size,
-            WIPOffset::<T>::alignment().max_of(SIZE_UOFFSET),
-        );
-        for i in (0..items.len()).rev() {
-            self.push(items[i].value);
-        }
-        let values_offsets = WIPOffset::new(self.push::<UOffsetT>(items.len() as UOffsetT).value());
+        items: &'b [UnionWIPOffset<T>],
+    ) -> UnionVectorWIPOffsets<'fbb, T> {
+        let item_size = WIPOffset::<T>::size();
+        let items_offsets = self.reserve_vector::<WIPOffset<T>>(items.len());
 
-        let discriminant_size = T::Tag::size();
-        self.align(
-            items.len() * discriminant_size,
-            T::Tag::alignment().max_of(SIZE_UOFFSET),
-        );
+        let tag_size = T::Tag::size();
+        let tags_offsets = self.reserve_vector::<T::Tag>(items.len());
+
+        let mut items_head = self.owned_buf.len() - items_offsets.1.value() as usize;
+        let mut tags_head = self.owned_buf.len() - tags_offsets.1.value() as usize;
+
         for i in (0..items.len()).rev() {
-            self.push(items[i].tag);
+            items_head = items_head - item_size;
+            tags_head = tags_head - tag_size;
+            {
+                let (dst, rest) = (&mut self.owned_buf[items_head..]).split_at_mut(item_size);
+                items[i].value_offset().push(dst, rest);
+            }
+            {
+                let (dst, rest) = (&mut self.owned_buf[tags_head..]).split_at_mut(tag_size);
+                items[i].tag().push(dst, rest);
+            }
         }
-        let tags_offsets = WIPOffset::new(self.push::<UOffsetT>(items.len() as UOffsetT).value());
-        TaggedVectorWIPOffset {
-            tags: tags_offsets,
-            values: values_offsets,
-        }
+        UnionVectorWIPOffsets::new(tags_offsets.0, items_offsets.0)
     }
 
     /// Create a vector of Push-able objects.
@@ -730,6 +722,24 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
         self.owned_buf[n..n + x.len()].copy_from_slice(x);
 
         n as UOffsetT
+    }
+
+    /// Reserves space for a vector of items.
+    /// Returns a tuple containing `WIPOffset` to the allocated vector
+    /// and `WIPOffset` pointing immediately behind the vector
+    #[inline]
+    pub fn reserve_vector<T: Push>(
+        &mut self,
+        num_elems: usize,
+    ) -> (WIPOffset<Vector<'fbb, T::Output>>, WIPOffset<T>) {
+        let sequence_size = num_elems * T::size();
+        self.align(sequence_size, T::alignment().max_of(SIZE_UOFFSET));
+        let sequence_end = WIPOffset::new(self.used_space() as UOffsetT);
+        self.make_space(sequence_size);
+        (
+            WIPOffset::new(self.push::<UOffsetT>(num_elems as UOffsetT).value()),
+            sequence_end,
+        )
     }
 
     #[inline]

@@ -66,10 +66,6 @@ pub struct TableFinishedWIPOffset {}
 #[derive(Clone, Copy)]
 pub struct TableUnfinishedWIPOffset {}
 
-/// UnionWIPOffset marks a WIPOffset as being for a union value.
-#[derive(Clone, Copy)]
-pub struct UnionWIPOffset {}
-
 /// VTableWIPOffset marks a WIPOffset as being for a vtable.
 #[derive(Clone, Copy)]
 pub struct VTableWIPOffset {}
@@ -118,13 +114,6 @@ impl<'a, T: 'a> WIPOffset<T> {
         }
     }
 
-    /// Return a wrapped value that brings its meaning as a union WIPOffset
-    /// into the type system.
-    #[inline(always)]
-    #[deprecated(since = "2.0.0", note = "Deprecated in favor of TaggedWIPOffset.")]
-    pub fn as_union_value(self) -> WIPOffset<UnionWIPOffset> {
-        WIPOffset::new(self.0)
-    }
     /// Get the underlying value.
     #[inline(always)]
     pub fn value(self) -> UOffsetT {

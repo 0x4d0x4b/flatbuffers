@@ -8,7 +8,7 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
+use self::flatbuffers::{EndianScalar, TaggedUnion};
 
 #[allow(unused_imports, dead_code)]
 pub mod my_game {
@@ -19,7 +19,7 @@ pub mod my_game {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
+  use self::flatbuffers::{EndianScalar, TaggedUnion};
 
 pub enum InParentNamespaceOffset {}
 #[derive(Copy, Clone, PartialEq)]
@@ -133,7 +133,7 @@ pub mod example_2 {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
+  use self::flatbuffers::{EndianScalar, TaggedUnion};
 
 pub enum MonsterOffset {}
 #[derive(Copy, Clone, PartialEq)]
@@ -249,7 +249,7 @@ pub mod example {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TagUnionValueOffset};
+  use self::flatbuffers::{EndianScalar, TaggedUnion};
 
 #[allow(non_upper_case_globals)]
 mod bitflags_color {
@@ -444,6 +444,28 @@ impl Any {
       _ => None,
     }
   }
+
+  #[inline]
+  pub fn tag_as_monster(
+    o: flatbuffers::WIPOffset<Monster>,
+  ) -> flatbuffers::UnionWIPOffset<AnyUnionValue> {
+    flatbuffers::UnionWIPOffset::new(Self::Monster, flatbuffers::WIPOffset::new(o.value()))
+  }
+
+  #[inline]
+  pub fn tag_as_test_simple_table_with_enum(
+    o: flatbuffers::WIPOffset<TestSimpleTableWithEnum>,
+  ) -> flatbuffers::UnionWIPOffset<AnyUnionValue> {
+    flatbuffers::UnionWIPOffset::new(Self::TestSimpleTableWithEnum, flatbuffers::WIPOffset::new(o.value()))
+  }
+
+  #[inline]
+  pub fn tag_as_my_game_example_2_monster(
+    o: flatbuffers::WIPOffset<super::example_2::Monster>,
+  ) -> flatbuffers::UnionWIPOffset<AnyUnionValue> {
+    flatbuffers::UnionWIPOffset::new(Self::MyGame_Example2_Monster, flatbuffers::WIPOffset::new(o.value()))
+  }
+
 }
 impl std::fmt::Debug for Any {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -496,37 +518,13 @@ impl<'a> flatbuffers::Verifiable for Any {
 
 impl flatbuffers::SimpleToVerifyInSlice for Any {}
 
-pub struct AnyUnionTableOffset {}
+pub struct AnyUnionValue {}
 
-impl flatbuffers::TaggedUnion for AnyUnionTableOffset {
+impl flatbuffers::TaggedUnion for AnyUnionValue {
   type Tag = Any;
 }
 
-impl<'a> flatbuffers::TagUnionValueOffset<Monster<'a>> for AnyUnionTableOffset {
-  fn from_value_offset(
-    o: flatbuffers::WIPOffset<Monster<'a>>,
-  ) -> flatbuffers::TaggedWIPOffset<Self> {
-    flatbuffers::TaggedWIPOffset{ tag: Any::Monster, value: flatbuffers::WIPOffset::new(o.value()) }
-  }
-}
-
-impl<'a> flatbuffers::TagUnionValueOffset<TestSimpleTableWithEnum<'a>> for AnyUnionTableOffset {
-  fn from_value_offset(
-    o: flatbuffers::WIPOffset<TestSimpleTableWithEnum<'a>>,
-  ) -> flatbuffers::TaggedWIPOffset<Self> {
-    flatbuffers::TaggedWIPOffset{ tag: Any::TestSimpleTableWithEnum, value: flatbuffers::WIPOffset::new(o.value()) }
-  }
-}
-
-impl<'a> flatbuffers::TagUnionValueOffset<super::example_2::Monster<'a>> for AnyUnionTableOffset {
-  fn from_value_offset(
-    o: flatbuffers::WIPOffset<super::example_2::Monster<'a>>,
-  ) -> flatbuffers::TaggedWIPOffset<Self> {
-    flatbuffers::TaggedWIPOffset{ tag: Any::MyGame_Example2_Monster, value: flatbuffers::WIPOffset::new(o.value()) }
-  }
-}
-
-impl<'a> flatbuffers::UnionVerifiable<'a> for AnyUnionTableOffset {
+impl<'a> flatbuffers::UnionVerifiable<'a> for AnyUnionValue {
   fn run_union_verifier(
     v: &mut flatbuffers::Verifier,
     tag: <<Self as flatbuffers::TaggedUnion>::Tag as flatbuffers::Follow<'a>>::Inner,
@@ -575,12 +573,12 @@ impl AnyT {
       Self::MyGameExample2Monster(_) => Any::MyGame_Example2_Monster,
     }
   }
-  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder) -> Option<flatbuffers::WIPOffset<AnyUnionTableOffset>> {
+  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder) -> Option<flatbuffers::WIPOffset<AnyUnionValue>> {
     match self {
       Self::NONE => None,
-      Self::Monster(v) => Some(AnyUnionTableOffset::from_value_offset(v.pack(fbb)).value),
-      Self::TestSimpleTableWithEnum(v) => Some(AnyUnionTableOffset::from_value_offset(v.pack(fbb)).value),
-      Self::MyGameExample2Monster(v) => Some(AnyUnionTableOffset::from_value_offset(v.pack(fbb)).value),
+      Self::Monster(v) => Some(Any::tag_as_monster(v.pack(fbb)).value_offset()),
+      Self::TestSimpleTableWithEnum(v) => Some(Any::tag_as_test_simple_table_with_enum(v.pack(fbb)).value_offset()),
+      Self::MyGameExample2Monster(v) => Some(Any::tag_as_my_game_example_2_monster(v.pack(fbb)).value_offset()),
     }
   }
   /// If the union variant matches, return the owned MonsterT, setting the union to NONE.
@@ -688,6 +686,28 @@ impl AnyUniqueAliases {
       _ => None,
     }
   }
+
+  #[inline]
+  pub fn tag_as_m(
+    o: flatbuffers::WIPOffset<Monster>,
+  ) -> flatbuffers::UnionWIPOffset<AnyUniqueAliasesUnionValue> {
+    flatbuffers::UnionWIPOffset::new(Self::M, flatbuffers::WIPOffset::new(o.value()))
+  }
+
+  #[inline]
+  pub fn tag_as_ts(
+    o: flatbuffers::WIPOffset<TestSimpleTableWithEnum>,
+  ) -> flatbuffers::UnionWIPOffset<AnyUniqueAliasesUnionValue> {
+    flatbuffers::UnionWIPOffset::new(Self::TS, flatbuffers::WIPOffset::new(o.value()))
+  }
+
+  #[inline]
+  pub fn tag_as_m2(
+    o: flatbuffers::WIPOffset<super::example_2::Monster>,
+  ) -> flatbuffers::UnionWIPOffset<AnyUniqueAliasesUnionValue> {
+    flatbuffers::UnionWIPOffset::new(Self::M2, flatbuffers::WIPOffset::new(o.value()))
+  }
+
 }
 impl std::fmt::Debug for AnyUniqueAliases {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -740,37 +760,13 @@ impl<'a> flatbuffers::Verifiable for AnyUniqueAliases {
 
 impl flatbuffers::SimpleToVerifyInSlice for AnyUniqueAliases {}
 
-pub struct AnyUniqueAliasesUnionTableOffset {}
+pub struct AnyUniqueAliasesUnionValue {}
 
-impl flatbuffers::TaggedUnion for AnyUniqueAliasesUnionTableOffset {
+impl flatbuffers::TaggedUnion for AnyUniqueAliasesUnionValue {
   type Tag = AnyUniqueAliases;
 }
 
-impl<'a> flatbuffers::TagUnionValueOffset<Monster<'a>> for AnyUniqueAliasesUnionTableOffset {
-  fn from_value_offset(
-    o: flatbuffers::WIPOffset<Monster<'a>>,
-  ) -> flatbuffers::TaggedWIPOffset<Self> {
-    flatbuffers::TaggedWIPOffset{ tag: AnyUniqueAliases::M, value: flatbuffers::WIPOffset::new(o.value()) }
-  }
-}
-
-impl<'a> flatbuffers::TagUnionValueOffset<TestSimpleTableWithEnum<'a>> for AnyUniqueAliasesUnionTableOffset {
-  fn from_value_offset(
-    o: flatbuffers::WIPOffset<TestSimpleTableWithEnum<'a>>,
-  ) -> flatbuffers::TaggedWIPOffset<Self> {
-    flatbuffers::TaggedWIPOffset{ tag: AnyUniqueAliases::TS, value: flatbuffers::WIPOffset::new(o.value()) }
-  }
-}
-
-impl<'a> flatbuffers::TagUnionValueOffset<super::example_2::Monster<'a>> for AnyUniqueAliasesUnionTableOffset {
-  fn from_value_offset(
-    o: flatbuffers::WIPOffset<super::example_2::Monster<'a>>,
-  ) -> flatbuffers::TaggedWIPOffset<Self> {
-    flatbuffers::TaggedWIPOffset{ tag: AnyUniqueAliases::M2, value: flatbuffers::WIPOffset::new(o.value()) }
-  }
-}
-
-impl<'a> flatbuffers::UnionVerifiable<'a> for AnyUniqueAliasesUnionTableOffset {
+impl<'a> flatbuffers::UnionVerifiable<'a> for AnyUniqueAliasesUnionValue {
   fn run_union_verifier(
     v: &mut flatbuffers::Verifier,
     tag: <<Self as flatbuffers::TaggedUnion>::Tag as flatbuffers::Follow<'a>>::Inner,
@@ -819,12 +815,12 @@ impl AnyUniqueAliasesT {
       Self::M2(_) => AnyUniqueAliases::M2,
     }
   }
-  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder) -> Option<flatbuffers::WIPOffset<AnyUniqueAliasesUnionTableOffset>> {
+  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder) -> Option<flatbuffers::WIPOffset<AnyUniqueAliasesUnionValue>> {
     match self {
       Self::NONE => None,
-      Self::M(v) => Some(AnyUniqueAliasesUnionTableOffset::from_value_offset(v.pack(fbb)).value),
-      Self::TS(v) => Some(AnyUniqueAliasesUnionTableOffset::from_value_offset(v.pack(fbb)).value),
-      Self::M2(v) => Some(AnyUniqueAliasesUnionTableOffset::from_value_offset(v.pack(fbb)).value),
+      Self::M(v) => Some(AnyUniqueAliases::tag_as_m(v.pack(fbb)).value_offset()),
+      Self::TS(v) => Some(AnyUniqueAliases::tag_as_ts(v.pack(fbb)).value_offset()),
+      Self::M2(v) => Some(AnyUniqueAliases::tag_as_m2(v.pack(fbb)).value_offset()),
     }
   }
   /// If the union variant matches, return the owned MonsterT, setting the union to NONE.
@@ -932,6 +928,28 @@ impl AnyAmbiguousAliases {
       _ => None,
     }
   }
+
+  #[inline]
+  pub fn tag_as_m1(
+    o: flatbuffers::WIPOffset<Monster>,
+  ) -> flatbuffers::UnionWIPOffset<AnyAmbiguousAliasesUnionValue> {
+    flatbuffers::UnionWIPOffset::new(Self::M1, flatbuffers::WIPOffset::new(o.value()))
+  }
+
+  #[inline]
+  pub fn tag_as_m2(
+    o: flatbuffers::WIPOffset<Monster>,
+  ) -> flatbuffers::UnionWIPOffset<AnyAmbiguousAliasesUnionValue> {
+    flatbuffers::UnionWIPOffset::new(Self::M2, flatbuffers::WIPOffset::new(o.value()))
+  }
+
+  #[inline]
+  pub fn tag_as_m3(
+    o: flatbuffers::WIPOffset<Monster>,
+  ) -> flatbuffers::UnionWIPOffset<AnyAmbiguousAliasesUnionValue> {
+    flatbuffers::UnionWIPOffset::new(Self::M3, flatbuffers::WIPOffset::new(o.value()))
+  }
+
 }
 impl std::fmt::Debug for AnyAmbiguousAliases {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -984,21 +1002,13 @@ impl<'a> flatbuffers::Verifiable for AnyAmbiguousAliases {
 
 impl flatbuffers::SimpleToVerifyInSlice for AnyAmbiguousAliases {}
 
-pub struct AnyAmbiguousAliasesUnionTableOffset {}
+pub struct AnyAmbiguousAliasesUnionValue {}
 
-impl flatbuffers::TaggedUnion for AnyAmbiguousAliasesUnionTableOffset {
+impl flatbuffers::TaggedUnion for AnyAmbiguousAliasesUnionValue {
   type Tag = AnyAmbiguousAliases;
 }
 
-impl<'a> flatbuffers::TagUnionValueOffset<Monster<'a>> for AnyAmbiguousAliasesUnionTableOffset {
-  fn from_value_offset(
-    o: flatbuffers::WIPOffset<Monster<'a>>,
-  ) -> flatbuffers::TaggedWIPOffset<Self> {
-    flatbuffers::TaggedWIPOffset{ tag: AnyAmbiguousAliases::M1, value: flatbuffers::WIPOffset::new(o.value()) }
-  }
-}
-
-impl<'a> flatbuffers::UnionVerifiable<'a> for AnyAmbiguousAliasesUnionTableOffset {
+impl<'a> flatbuffers::UnionVerifiable<'a> for AnyAmbiguousAliasesUnionValue {
   fn run_union_verifier(
     v: &mut flatbuffers::Verifier,
     tag: <<Self as flatbuffers::TaggedUnion>::Tag as flatbuffers::Follow<'a>>::Inner,
@@ -1047,12 +1057,12 @@ impl AnyAmbiguousAliasesT {
       Self::M3(_) => AnyAmbiguousAliases::M3,
     }
   }
-  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder) -> Option<flatbuffers::WIPOffset<AnyAmbiguousAliasesUnionTableOffset>> {
+  pub fn pack(&self, fbb: &mut flatbuffers::FlatBufferBuilder) -> Option<flatbuffers::WIPOffset<AnyAmbiguousAliasesUnionValue>> {
     match self {
       Self::NONE => None,
-      Self::M1(v) => Some(AnyAmbiguousAliasesUnionTableOffset::from_value_offset(v.pack(fbb)).value),
-      Self::M2(v) => Some(AnyAmbiguousAliasesUnionTableOffset::from_value_offset(v.pack(fbb)).value),
-      Self::M3(v) => Some(AnyAmbiguousAliasesUnionTableOffset::from_value_offset(v.pack(fbb)).value),
+      Self::M1(v) => Some(AnyAmbiguousAliases::tag_as_m1(v.pack(fbb)).value_offset()),
+      Self::M2(v) => Some(AnyAmbiguousAliases::tag_as_m2(v.pack(fbb)).value_offset()),
+      Self::M3(v) => Some(AnyAmbiguousAliases::tag_as_m3(v.pack(fbb)).value_offset()),
     }
   }
   /// If the union variant matches, return the owned MonsterT, setting the union to NONE.
@@ -2764,7 +2774,7 @@ impl flatbuffers::Verifiable for Monster<'_> {
      .visit_field::<flatbuffers::ForwardsUOffset<&str>>(&"name", Self::VT_NAME, true)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(&"inventory", Self::VT_INVENTORY, false)?
      .visit_field::<Color>(&"color", Self::VT_COLOR, false)?
-     .visit_union::<AnyUnionTableOffset>(&"test_type", Self::VT_TEST_TYPE, &"test", Self::VT_TEST, false,
+     .visit_union::<AnyUnionValue>(&"test_type", Self::VT_TEST_TYPE, &"test", Self::VT_TEST, false,
      )?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, Test>>>(&"test4", Self::VT_TEST4, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>>>(&"testarrayofstring", Self::VT_TESTARRAYOFSTRING, false)?
@@ -2800,9 +2810,9 @@ impl flatbuffers::Verifiable for Monster<'_> {
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u64>>>(&"vector_of_co_owning_references", Self::VT_VECTOR_OF_CO_OWNING_REFERENCES, false)?
      .visit_field::<u64>(&"non_owning_reference", Self::VT_NON_OWNING_REFERENCE, false)?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u64>>>(&"vector_of_non_owning_references", Self::VT_VECTOR_OF_NON_OWNING_REFERENCES, false)?
-     .visit_union::<AnyUniqueAliasesUnionTableOffset>(&"any_unique_type", Self::VT_ANY_UNIQUE_TYPE, &"any_unique", Self::VT_ANY_UNIQUE, false,
+     .visit_union::<AnyUniqueAliasesUnionValue>(&"any_unique_type", Self::VT_ANY_UNIQUE_TYPE, &"any_unique", Self::VT_ANY_UNIQUE, false,
      )?
-     .visit_union::<AnyAmbiguousAliasesUnionTableOffset>(&"any_ambiguous_type", Self::VT_ANY_AMBIGUOUS_TYPE, &"any_ambiguous", Self::VT_ANY_AMBIGUOUS, false,
+     .visit_union::<AnyAmbiguousAliasesUnionValue>(&"any_ambiguous_type", Self::VT_ANY_AMBIGUOUS_TYPE, &"any_ambiguous", Self::VT_ANY_AMBIGUOUS, false,
      )?
      .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, Color>>>(&"vector_of_enums", Self::VT_VECTOR_OF_ENUMS, false)?
      .visit_field::<Race>(&"signed_enum", Self::VT_SIGNED_ENUM, false)?
@@ -2820,7 +2830,7 @@ pub struct MonsterArgs<'a> {
     pub inventory: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub color: Color,
     pub test_type: Any,
-    pub test: Option<flatbuffers::WIPOffset<AnyUnionTableOffset>>,
+    pub test: Option<flatbuffers::WIPOffset<AnyUnionValue>>,
     pub test4: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, Test>>>,
     pub testarrayofstring: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>,
     pub testarrayoftables: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Monster<'a>>>>>,
@@ -2856,9 +2866,9 @@ pub struct MonsterArgs<'a> {
     pub non_owning_reference: u64,
     pub vector_of_non_owning_references: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u64>>>,
     pub any_unique_type: AnyUniqueAliases,
-    pub any_unique: Option<flatbuffers::WIPOffset<AnyUniqueAliasesUnionTableOffset>>,
+    pub any_unique: Option<flatbuffers::WIPOffset<AnyUniqueAliasesUnionValue>>,
     pub any_ambiguous_type: AnyAmbiguousAliases,
-    pub any_ambiguous: Option<flatbuffers::WIPOffset<AnyAmbiguousAliasesUnionTableOffset>>,
+    pub any_ambiguous: Option<flatbuffers::WIPOffset<AnyAmbiguousAliasesUnionValue>>,
     pub vector_of_enums: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, Color>>>,
     pub signed_enum: Race,
     pub testrequirednestedflatbuffer: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
@@ -2955,7 +2965,7 @@ impl<'a: 'b, 'b> MonsterBuilder<'a, 'b> {
     self.fbb_.push_slot::<Any>(Monster::VT_TEST_TYPE, test_type, Any::NONE);
   }
   #[inline]
-  pub fn add_test(&mut self, test: flatbuffers::WIPOffset<AnyUnionTableOffset>) {
+  pub fn add_test(&mut self, test: flatbuffers::WIPOffset<AnyUnionValue>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Monster::VT_TEST, test);
   }
   #[inline]
@@ -3099,7 +3109,7 @@ impl<'a: 'b, 'b> MonsterBuilder<'a, 'b> {
     self.fbb_.push_slot::<AnyUniqueAliases>(Monster::VT_ANY_UNIQUE_TYPE, any_unique_type, AnyUniqueAliases::NONE);
   }
   #[inline]
-  pub fn add_any_unique(&mut self, any_unique: flatbuffers::WIPOffset<AnyUniqueAliasesUnionTableOffset>) {
+  pub fn add_any_unique(&mut self, any_unique: flatbuffers::WIPOffset<AnyUniqueAliasesUnionValue>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Monster::VT_ANY_UNIQUE, any_unique);
   }
   #[inline]
@@ -3107,7 +3117,7 @@ impl<'a: 'b, 'b> MonsterBuilder<'a, 'b> {
     self.fbb_.push_slot::<AnyAmbiguousAliases>(Monster::VT_ANY_AMBIGUOUS_TYPE, any_ambiguous_type, AnyAmbiguousAliases::NONE);
   }
   #[inline]
-  pub fn add_any_ambiguous(&mut self, any_ambiguous: flatbuffers::WIPOffset<AnyAmbiguousAliasesUnionTableOffset>) {
+  pub fn add_any_ambiguous(&mut self, any_ambiguous: flatbuffers::WIPOffset<AnyAmbiguousAliasesUnionValue>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Monster::VT_ANY_AMBIGUOUS, any_ambiguous);
   }
   #[inline]

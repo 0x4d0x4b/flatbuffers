@@ -28,7 +28,6 @@ static A: TrackingAllocator = TrackingAllocator;
 
 // import the flatbuffers generated code:
 extern crate flatbuffers;
-use flatbuffers::TagUnionValueOffset;
 
 #[allow(dead_code, unused_imports)]
 #[path = "../../include_test/include_test1_generated.rs"]
@@ -71,7 +70,7 @@ fn create_serialized_example_with_generated_code(builder: &mut flatbuffers::Flat
             &my_game::example::Test::new(5i16, 6i8),
         );
 
-        let monster_as_union = my_game::example::AnyUnionTableOffset::from_value_offset(
+        let monster_as_union = my_game::example::Any::tag_as_monster(
             my_game::example::Monster::create(
                 builder,
                 &my_game::example::MonsterArgs {
@@ -86,8 +85,8 @@ fn create_serialized_example_with_generated_code(builder: &mut flatbuffers::Flat
             mana: 150,
             name: Some(builder.create_string("MyMonster")),
             pos: Some(&pos),
-            test_type: monster_as_union.tag,
-            test: Some(monster_as_union.value),
+            test_type: monster_as_union.tag(),
+            test: Some(monster_as_union.value_offset()),
             inventory: Some(builder.create_vector_direct(&[0u8, 1, 2, 3, 4][..])),
             test4: Some(builder.create_vector_direct(&[
                 my_game::example::Test::new(10, 20),

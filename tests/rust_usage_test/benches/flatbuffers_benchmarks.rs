@@ -15,7 +15,6 @@
  */
 
 use bencher::Bencher;
-use flatbuffers::TagUnionValueOffset;
 
 #[allow(dead_code, unused_imports)]
 #[path = "../../include_test/include_test1_generated.rs"]
@@ -107,7 +106,7 @@ fn create_serialized_example_with_generated_code(
             my_game::example::Color::Green,
             &my_game::example::Test::new(5i16, 6i8),
         );
-        let monster_as_union = my_game::example::AnyUnionTableOffset::from_value_offset(
+        let monster_as_union = my_game::example::Any::tag_as_monster(
             my_game::example::Monster::create(
                 builder,
                 &my_game::example::MonsterArgs {
@@ -121,8 +120,8 @@ fn create_serialized_example_with_generated_code(
             mana: 150,
             name: Some(name),
             pos: Some(&pos),
-            test_type: monster_as_union.tag,
-            test: Some(monster_as_union.value),
+            test_type: monster_as_union.tag(),
+            test: Some(monster_as_union.value_offset()),
             inventory: Some(inventory),
             test4: Some(test4),
             testarrayofstring: Some(builder.create_vector(&[s0, s1])),

@@ -32,8 +32,6 @@ mod flexbuffers_tests;
 mod optional_scalars_test;
 mod more_defaults_test;
 
-use flatbuffers::TagUnionValueOffset;
-
 #[allow(dead_code, unused_imports)]
 #[path = "../../include_test/include_test1_generated.rs"]
 pub mod include_test1_generated;
@@ -196,7 +194,7 @@ fn create_serialized_example_with_generated_code(builder: &mut flatbuffers::Flat
         // can't inline creation of this Vec3 because we refer to it by reference, so it must live
         // long enough to be used by MonsterArgs.
         let pos = my_game::example::Vec3::new(1.0, 2.0, 3.0, 3.0, my_game::example::Color::Green, &my_game::example::Test::new(5i16, 6i8));
-        let monster_as_union = my_game::example::AnyUnionTableOffset::from_value_offset(
+        let monster_as_union = my_game::example::Any::tag_as_monster(
             my_game::example::Monster::create(builder, &my_game::example::MonsterArgs{
                 name: Some(fred_name),
                 ..Default::default()
@@ -208,8 +206,8 @@ fn create_serialized_example_with_generated_code(builder: &mut flatbuffers::Flat
             mana: 150,
             name: Some(builder.create_string("MyMonster")),
             pos: Some(&pos),
-            test_type: monster_as_union.tag,
-            test: Some(monster_as_union.value),
+            test_type: monster_as_union.tag(),
+            test: Some(monster_as_union.value_offset()),
             inventory: Some(builder.create_vector_direct(&[0u8, 1, 2, 3, 4][..])),
             test4: Some(builder.create_vector_direct(&[my_game::example::Test::new(10, 20),
                                                        my_game::example::Test::new(30, 40)])),
@@ -585,7 +583,6 @@ mod lifetime_correctness {
 #[cfg(test)]
 mod roundtrip_generated_code {
     extern crate flatbuffers;
-    use flatbuffers::TagUnionValueOffset;
 
     use super::my_game;
 
@@ -659,7 +656,7 @@ mod roundtrip_generated_code {
             let name_inner = b.create_string("foo");
             let name_outer = b.create_string("bar");
 
-            let inner = my_game::example::AnyUnionTableOffset::from_value_offset(
+            let inner = my_game::example::Any::tag_as_monster(
                 my_game::example::Monster::create(b, &my_game::example::MonsterArgs{
                     name: Some(name_inner),
                     ..Default::default()
@@ -667,8 +664,8 @@ mod roundtrip_generated_code {
             );
             let outer = my_game::example::Monster::create(b, &my_game::example::MonsterArgs{
                 name: Some(name_outer),
-                test_type: inner.tag,
-                test: Some(inner.value),
+                test_type: inner.tag(),
+                test: Some(inner.value_offset()),
                 ..Default::default()
             });
             my_game::example::finish_monster_buffer(b, outer);
