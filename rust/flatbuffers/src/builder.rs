@@ -359,6 +359,7 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
         &'a mut self,
         items: &'b [UnionWIPOffset<T>],
     ) -> UnionVectorWIPOffsets<'fbb, T> {
+        self.assert_not_nested("create_vector_of_unions can not be called when a table or vector is under construction");
         let item_size = WIPOffset::<T>::size();
         let items_offsets = self.reserve_vector::<WIPOffset<T>>(items.len());
 
