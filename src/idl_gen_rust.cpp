@@ -846,20 +846,25 @@ class RustGenerator : public BaseGenerator {
 
   // CASPER: dedup Object versions from non object versions.
   void ForAllUnionObjectVariantsBesidesNone(const EnumDef &enum_def,
-                                            std::function<void()> cb) {
+                                            std::function<void(const EnumVal &ev)> cb) {
     for (auto it = enum_def.Vals().begin(); it != enum_def.Vals().end(); ++it) {
       auto &enum_val = **it;
       if (enum_val.union_type.base_type == BASE_TYPE_NONE) continue;
       code_.SetValue("VARIANT_NAME", Name(enum_val));
       code_.SetValue("NATIVE_VARIANT", MakeCamel(Name(enum_val)));
-      code_.SetValue("NATIVE_U_ELEMENT_TYPE",
-          NamespacedNativeName(*enum_val.union_type.struct_def));
       code_.SetValue("U_ELEMENT_NAME", MakeSnakeCase(Name(enum_val)));
-      code_.SetValue(
-          "U_ELEMENT_TABLE_TYPE",
-          WrapInNameSpace(enum_val.union_type.struct_def->defined_namespace,
-                          enum_val.union_type.struct_def->name));
-      cb();
+      if (enum_val.union_type.base_type != BASE_TYPE_STRING) {
+        code_.SetValue("NATIVE_U_ELEMENT_TYPE",
+            NamespacedNativeName(*enum_val.union_type.struct_def));
+        code_.SetValue(
+            "U_ELEMENT_TABLE_TYPE",
+            WrapInNameSpace(enum_val.union_type.struct_def->defined_namespace,
+                            enum_val.union_type.struct_def->name));
+      } else {
+        code_.SetValue("NATIVE_U_ELEMENT_TYPE", "std::string::String");
+        code_.SetValue("U_ELEMENT_TABLE_TYPE", "&str");
+      }
+      cb(enum_val);
     }
   }
 
@@ -900,7 +905,7 @@ class RustGenerator : public BaseGenerator {
     code_ += "#[derive(Debug, Clone, PartialEq)]";
     code_ += "pub enum {{NATIVE_NAME}} {";
     code_ += "  NONE,";
-    ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
+    ForAllUnionObjectVariantsBesidesNone(enum_def, [&](const EnumVal &ev) {
       code_ += "  {{NATIVE_VARIANT}}(Box<{{NATIVE_U_ELEMENT_TYPE}}>),";
     });
     code_ += "}";
@@ -919,7 +924,7 @@ class RustGenerator : public BaseGenerator {
     code_ += "  pub fn {{ENUM_NAME_SNAKE}}_type(&self) -> {{ENUM_NAME}} {";
     code_ += "    match self {";
     code_ += "      Self::NONE => {{ENUM_NAME}}::NONE,";
-    ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
+    ForAllUnionObjectVariantsBesidesNone(enum_def, [&](const EnumVal &ev) {
       code_ +=
           "      Self::{{NATIVE_VARIANT}}(_) => {{ENUM_NAME}}::"
           "{{VARIANT_NAME}},";
@@ -933,16 +938,21 @@ class RustGenerator : public BaseGenerator {
         " {";
     code_ += "    match self {";
     code_ += "      Self::NONE => None,";
-    ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
+    ForAllUnionObjectVariantsBesidesNone(enum_def, [&](const EnumVal &ev) {
+      if (ev.union_type.base_type != BASE_TYPE_STRING) {
+        code_.SetValue("PACK_FUNCTION_CALL", "v.pack(fbb)");
+      } else {
+        code_.SetValue("PACK_FUNCTION_CALL", "fbb.create_string(v.as_str())");
+      }
       code_ +=
           "      Self::{{NATIVE_VARIANT}}(v) => "
-          "Some({{ENUM_NAME}}::tag_as_{{U_ELEMENT_NAME}}(v.pack(fbb)).value_offset()),";
+          "Some({{ENUM_NAME}}::tag_as_{{U_ELEMENT_NAME}}({{PACK_FUNCTION_CALL}}).value_offset()),";
     });
     code_ += "    }";
     code_ += "  }";
 
     // Generate some accessors;
-    ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
+    ForAllUnionObjectVariantsBesidesNone(enum_def, [&](const EnumVal &ev) {
       // Move accessor.
       code_ +=
           "  /// If the union variant matches, return the owned "
@@ -1518,11 +1528,15 @@ class RustGenerator : public BaseGenerator {
       code_.SetValue(
           "U_ELEMENT_ENUM_TYPE",
           WrapInNameSpace(def.defined_namespace, GetEnumValue(def, ev)));
-      code_.SetValue(
-          "U_ELEMENT_TABLE_TYPE",
-          WrapInNameSpace(ev.union_type.struct_def->defined_namespace,
-                          ev.union_type.struct_def->name));
       code_.SetValue("U_ELEMENT_NAME", MakeSnakeCase(Name(ev)));
+      if (ev.union_type.base_type != BASE_TYPE_STRING) {
+          code_.SetValue(
+              "U_ELEMENT_TABLE_TYPE",
+              WrapInNameSpace(ev.union_type.struct_def->defined_namespace,
+                              ev.union_type.struct_def->name));
+      } else {
+          code_.SetValue("U_ELEMENT_TABLE_TYPE", "&str");
+      }
       cb(ev);
     }
   }
@@ -1650,7 +1664,12 @@ class RustGenerator : public BaseGenerator {
             code_ +=
                 "        {{ENUM_NAME}}::NONE =>"
                 " {{NATIVE_ENUM_NAME}}::NONE,";
-            ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
+            ForAllUnionObjectVariantsBesidesNone(enum_def, [&](const EnumVal &ev) {
+              if (ev.union_type.base_type != BASE_TYPE_STRING) {
+                code_.SetValue("UNPACK_FUNCTION", "unpack()");
+              } else {
+                code_.SetValue("UNPACK_FUNCTION", "to_string()");
+              }
               code_ +=
                   "        {{ENUM_NAME}}::{{VARIANT_NAME}} => "
                   "{{NATIVE_ENUM_NAME}}::{{NATIVE_VARIANT}}(Box::new(";
@@ -1660,7 +1679,7 @@ class RustGenerator : public BaseGenerator {
               code_ +=
                   "              .expect(\"Invalid union table, "
                   "expected `{{ENUM_NAME}}::{{VARIANT_NAME}}`.\")";
-              code_ += "              .unpack()";
+              code_ += "              .{{UNPACK_FUNCTION}}";
               code_ += "        )),";
             });
             // Maybe we shouldn't throw away unknown discriminants?
@@ -1732,12 +1751,17 @@ class RustGenerator : public BaseGenerator {
                 "              match key {";
             code_ +=
                 "                &{{ENUM_NAME}}::NONE => {{NATIVE_ENUM_NAME}}::NONE,";
-            ForAllUnionObjectVariantsBesidesNone(enum_def, [&] {
+            ForAllUnionObjectVariantsBesidesNone(enum_def, [&](const EnumVal &ev) {
+              if (ev.union_type.base_type != BASE_TYPE_STRING) {
+                code_.SetValue("UNPACK_FUNCTION_CALL", "init_from_table(table).unpack()");
+              } else {
+                code_.SetValue("UNPACK_FUNCTION_CALL", "follow(table.buf, table.loc).to_string()");
+              }
               code_ +=
                   "                &{{ENUM_NAME}}::{{VARIANT_NAME}} => "
                   "{{NATIVE_ENUM_NAME}}::{{NATIVE_VARIANT}}(Box::new(";
               code_ +=
-                  "                    {{U_ELEMENT_TABLE_TYPE}}::init_from_table(table).unpack())),";
+                  "                    <{{U_ELEMENT_TABLE_TYPE}}>::{{UNPACK_FUNCTION_CALL}})),";
             });
             code_ +=
                 "                _ => {{NATIVE_ENUM_NAME}}::NONE,";
@@ -1842,13 +1866,21 @@ class RustGenerator : public BaseGenerator {
       if (field.value.type.base_type != BASE_TYPE_UNION) return;
       code_.SetValue("FIELD_TYPE_FIELD_NAME", field.name);
       ForAllUnionVariantsBesidesNone(
-          *field.value.type.enum_def, [&](const EnumVal &unused) {
-            (void)unused;
+          *field.value.type.enum_def, [&](const EnumVal &ev) {
+            if (ev.union_type.base_type != BASE_TYPE_STRING) {
+              code_.SetValue("CLOSURE", "");
+              code_.SetValue("INIT_FUNCTION_CALL", "init_from_table");
+              code_.SetValue("RETURN_TYPE", code_.GetValue("U_ELEMENT_TABLE_TYPE") + "<'a>");
+            } else {
+              code_.SetValue("CLOSURE", "|t| ");
+              code_.SetValue("INIT_FUNCTION_CALL", "follow(t.buf, t.loc)");
+              code_.SetValue("RETURN_TYPE", code_.GetValue("U_ELEMENT_TABLE_TYPE"));
+            }
             code_ += "  #[inline]";
             code_ += "  #[allow(non_snake_case)]";
             code_ +=
                 "  pub fn {{FIELD_NAME}}_as_{{U_ELEMENT_NAME}}(&self) -> "
-                "Option<{{U_ELEMENT_TABLE_TYPE}}<'a>> {";
+                "Option<{{RETURN_TYPE}}> {";
             // If the user defined schemas name a field that clashes with a
             // language reserved word, flatc will try to escape the field name
             // by appending an underscore. This works well for most cases,
@@ -1872,8 +1904,8 @@ class RustGenerator : public BaseGenerator {
                   "      Some({{U_ELEMENT_TABLE_TYPE}}::init_from_table(u))";
             } else {
               code_ +=
-                  "      self.{{FIELD_NAME}}().map("
-                  "{{U_ELEMENT_TABLE_TYPE}}::init_from_table)";
+                  "      self.{{FIELD_NAME}}().map({{CLOSURE}}"
+                  "<{{U_ELEMENT_TABLE_TYPE}}>::{{INIT_FUNCTION_CALL}})";
             }
             code_ += "    } else {";
             code_ += "      None";
@@ -2734,7 +2766,7 @@ class RustGenerator : public BaseGenerator {
     code_ += indent + "use std::cmp::Ordering;";
     code_ += "";
     code_ += indent + "extern crate flatbuffers;";
-    code_ += indent + "use self::flatbuffers::{EndianScalar, TaggedUnion};";
+    code_ += indent + "use self::flatbuffers::{EndianScalar, Follow, TaggedUnion};";
   }
 
   // Set up the correct namespace. This opens a namespace if the current

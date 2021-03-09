@@ -6,7 +6,7 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::{EndianScalar, TaggedUnion};
+use self::flatbuffers::{EndianScalar, Follow, TaggedUnion};
 
 #[allow(unused_imports, dead_code)]
 pub mod namespace_a {
@@ -15,7 +15,7 @@ pub mod namespace_a {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TaggedUnion};
+  use self::flatbuffers::{EndianScalar, Follow, TaggedUnion};
 #[allow(unused_imports, dead_code)]
 pub mod namespace_b {
 
@@ -23,7 +23,7 @@ pub mod namespace_b {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TaggedUnion};
+  use self::flatbuffers::{EndianScalar, Follow, TaggedUnion};
 
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_UNION_IN_NESTED_NS: u8 = 0;
@@ -672,7 +672,7 @@ impl<'a> TableInFirstNS<'a> {
   #[allow(non_snake_case)]
   pub fn foo_union_as_table_in_nested_ns(&self) -> Option<namespace_b::TableInNestedNS<'a>> {
     if self.foo_union_type() == namespace_b::UnionInNestedNS::TableInNestedNS {
-      self.foo_union().map(namespace_b::TableInNestedNS::init_from_table)
+      self.foo_union().map(<namespace_b::TableInNestedNS>::init_from_table)
     } else {
       None
     }
@@ -955,7 +955,7 @@ pub mod namespace_c {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TaggedUnion};
+  use self::flatbuffers::{EndianScalar, Follow, TaggedUnion};
 
 pub enum TableInCOffset {}
 #[derive(Copy, Clone, PartialEq)]

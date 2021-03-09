@@ -48,6 +48,7 @@ set TEST_NOINCL_FLAGS=%TEST_BASE_FLAGS% --no-includes
 ..\%buildtype%\flatc.exe --rust --gen-all %TEST_RUST_FLAGS% -o namespace_test namespace_test/namespace_test1.fbs namespace_test/namespace_test2.fbs || goto FAIL
 
 ..\%buildtype%\flatc.exe --cpp --java --csharp --ts --php %TEST_BASE_FLAGS% %TEST_CPP_FLAGS% %TEST_CS_FLAGS% %TEST_JS_TS_FLAGS% -o union_vector ./union_vector/union_vector.fbs || goto FAIL
+..\%buildtype%\flatc.exe --rust %TEST_RUST_FLAGS% -o union_vector ./union_vector/union_vector.fbs || goto FAIL
 ..\%buildtype%\flatc.exe --rust -I include_test -o include_test include_test/include_test1.fbs || goto FAIL
 ..\%buildtype%\flatc.exe --rust -I include_test -o include_test/sub include_test/sub/include_test2.fbs || goto FAIL
 ..\%buildtype%\flatc.exe -b --schema --bfbs-comments --bfbs-builtins -I include_test monster_test.fbs || goto FAIL

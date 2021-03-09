@@ -8,7 +8,7 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::{EndianScalar, TaggedUnion};
+use self::flatbuffers::{EndianScalar, Follow, TaggedUnion};
 
 #[allow(unused_imports, dead_code)]
 pub mod my_game {
@@ -19,7 +19,7 @@ pub mod my_game {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TaggedUnion};
+  use self::flatbuffers::{EndianScalar, Follow, TaggedUnion};
 
 pub enum InParentNamespaceOffset {}
 #[derive(Copy, Clone, PartialEq)]
@@ -133,7 +133,7 @@ pub mod example_2 {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TaggedUnion};
+  use self::flatbuffers::{EndianScalar, Follow, TaggedUnion};
 
 pub enum MonsterOffset {}
 #[derive(Copy, Clone, PartialEq)]
@@ -249,7 +249,7 @@ pub mod example {
   use std::cmp::Ordering;
 
   extern crate flatbuffers;
-  use self::flatbuffers::{EndianScalar, TaggedUnion};
+  use self::flatbuffers::{EndianScalar, Follow, TaggedUnion};
 
 #[allow(non_upper_case_globals)]
 mod bitflags_color {
@@ -2808,7 +2808,7 @@ impl<'a> Monster<'a> {
   #[allow(non_snake_case)]
   pub fn test_as_monster(&self) -> Option<Monster<'a>> {
     if self.test_type() == Any::Monster {
-      self.test().map(Monster::init_from_table)
+      self.test().map(<Monster>::init_from_table)
     } else {
       None
     }
@@ -2818,7 +2818,7 @@ impl<'a> Monster<'a> {
   #[allow(non_snake_case)]
   pub fn test_as_test_simple_table_with_enum(&self) -> Option<TestSimpleTableWithEnum<'a>> {
     if self.test_type() == Any::TestSimpleTableWithEnum {
-      self.test().map(TestSimpleTableWithEnum::init_from_table)
+      self.test().map(<TestSimpleTableWithEnum>::init_from_table)
     } else {
       None
     }
@@ -2828,7 +2828,7 @@ impl<'a> Monster<'a> {
   #[allow(non_snake_case)]
   pub fn test_as_my_game_example_2_monster(&self) -> Option<super::example_2::Monster<'a>> {
     if self.test_type() == Any::MyGame_Example2_Monster {
-      self.test().map(super::example_2::Monster::init_from_table)
+      self.test().map(<super::example_2::Monster>::init_from_table)
     } else {
       None
     }
@@ -2838,7 +2838,7 @@ impl<'a> Monster<'a> {
   #[allow(non_snake_case)]
   pub fn any_unique_as_m(&self) -> Option<Monster<'a>> {
     if self.any_unique_type() == AnyUniqueAliases::M {
-      self.any_unique().map(Monster::init_from_table)
+      self.any_unique().map(<Monster>::init_from_table)
     } else {
       None
     }
@@ -2848,7 +2848,7 @@ impl<'a> Monster<'a> {
   #[allow(non_snake_case)]
   pub fn any_unique_as_ts(&self) -> Option<TestSimpleTableWithEnum<'a>> {
     if self.any_unique_type() == AnyUniqueAliases::TS {
-      self.any_unique().map(TestSimpleTableWithEnum::init_from_table)
+      self.any_unique().map(<TestSimpleTableWithEnum>::init_from_table)
     } else {
       None
     }
@@ -2858,7 +2858,7 @@ impl<'a> Monster<'a> {
   #[allow(non_snake_case)]
   pub fn any_unique_as_m2(&self) -> Option<super::example_2::Monster<'a>> {
     if self.any_unique_type() == AnyUniqueAliases::M2 {
-      self.any_unique().map(super::example_2::Monster::init_from_table)
+      self.any_unique().map(<super::example_2::Monster>::init_from_table)
     } else {
       None
     }
@@ -2868,7 +2868,7 @@ impl<'a> Monster<'a> {
   #[allow(non_snake_case)]
   pub fn any_ambiguous_as_m1(&self) -> Option<Monster<'a>> {
     if self.any_ambiguous_type() == AnyAmbiguousAliases::M1 {
-      self.any_ambiguous().map(Monster::init_from_table)
+      self.any_ambiguous().map(<Monster>::init_from_table)
     } else {
       None
     }
@@ -2878,7 +2878,7 @@ impl<'a> Monster<'a> {
   #[allow(non_snake_case)]
   pub fn any_ambiguous_as_m2(&self) -> Option<Monster<'a>> {
     if self.any_ambiguous_type() == AnyAmbiguousAliases::M2 {
-      self.any_ambiguous().map(Monster::init_from_table)
+      self.any_ambiguous().map(<Monster>::init_from_table)
     } else {
       None
     }
@@ -2888,7 +2888,7 @@ impl<'a> Monster<'a> {
   #[allow(non_snake_case)]
   pub fn any_ambiguous_as_m3(&self) -> Option<Monster<'a>> {
     if self.any_ambiguous_type() == AnyAmbiguousAliases::M3 {
-      self.any_ambiguous().map(Monster::init_from_table)
+      self.any_ambiguous().map(<Monster>::init_from_table)
     } else {
       None
     }

@@ -6,7 +6,7 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::{EndianScalar, TaggedUnion};
+use self::flatbuffers::{EndianScalar, Follow, TaggedUnion};
 
 pub enum MoreDefaultsOffset {}
 #[derive(Copy, Clone, PartialEq)]
