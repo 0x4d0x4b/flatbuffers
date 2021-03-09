@@ -19,7 +19,7 @@ use crate::{Push, Vector};
 
 /// A trait defining TaggedUnion interface
 pub trait TaggedUnion {
-    type Tag: Push<Output = Self::Tag> + Clone + Copy;
+    type Tag: Push<Output = Self::Tag> + Clone + Copy + Into<u8>;
 }
 
 /// UnionWIPOffset marks a `WIPOffset` as being for a union value.

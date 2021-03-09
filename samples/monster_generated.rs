@@ -207,6 +207,41 @@ impl<'a> flatbuffers::Verifiable for Equipment {
 
 impl flatbuffers::SimpleToVerifyInSlice for Equipment {}
 
+impl From<Equipment> for u8 {
+  #[inline]
+  fn from(v: Equipment) -> u8 {
+    v.0
+  }
+}
+
+impl<'a: 'b, 'b> flatbuffers::BuildVector<'a, 'b> for Equipment {
+  type VectorBuilder = EquipmentVectorBuilder<'a, 'b>;
+}
+
+pub struct EquipmentVectorBuilder<'a: 'b, 'b> {
+  fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+  num_items: usize,
+}
+
+impl<'a: 'b, 'b> EquipmentVectorBuilder<'a, 'b> {
+  #[inline]
+  pub fn new(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, num_items: usize) -> Self {
+    fbb.start_union_vector::<EquipmentUnionValue>(num_items);
+    Self { fbb, num_items }
+  }
+
+  #[inline]
+  pub fn finish(&mut self) -> flatbuffers::UnionVectorWIPOffsets<'a, EquipmentUnionValue> {
+    self.fbb.end_union_vector(self.num_items)
+  }
+
+  #[inline]
+  pub fn push_as_weapon(&mut self, o: flatbuffers::WIPOffset<Weapon>) {
+    self.fbb.push_union_vector_item(Equipment::tag_as_weapon(o));
+  }
+
+}
+
 pub struct EquipmentUnionValue {}
 
 impl flatbuffers::TaggedUnion for EquipmentUnionValue {

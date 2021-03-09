@@ -792,9 +792,51 @@ class RustGenerator : public BaseGenerator {
     code_ += "";
 
     if (enum_def.is_union) {
-      // Generate typesafe offset(s) for unions
       code_.SetValue("NAME", Name(enum_def));
       code_.SetValue("UNION_OFFSET_TYPE", UnionOffsetType(enum_def));
+      code_.SetValue("UNION_VECTOR_BUILDER", Name(enum_def) + "VectorBuilder");
+      // Enable convertion to u8
+      code_ += "impl From<{{ENUM_NAME}}> for u8 {";
+      code_ += "  #[inline]";
+      code_ += "  fn from(v: {{ENUM_NAME}}) -> u8 {";
+      code_ += "    v.0";
+      code_ += "  }";
+      code_ += "}";
+      code_ += "";
+      // Define BuildVector trait
+      code_ += "impl<'a: 'b, 'b> flatbuffers::BuildVector<'a, 'b> for {{ENUM_NAME}} {";
+      code_ += "  type VectorBuilder = {{UNION_VECTOR_BUILDER}}<'a, 'b>;";
+      code_ += "}";
+      code_ += "";
+      // Define VectorBuilder
+      code_ += "pub struct {{UNION_VECTOR_BUILDER}}<'a: 'b, 'b> {";
+      code_ += "  fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,";
+      code_ += "  num_items: usize,";
+      code_ += "}";
+      code_ += "";
+      code_ += "impl<'a: 'b, 'b> {{UNION_VECTOR_BUILDER}}<'a, 'b> {";
+      code_ += "  #[inline]";
+      code_ += "  pub fn new(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, num_items: usize) -> Self {";
+      code_ += "    fbb.start_union_vector::<{{UNION_OFFSET_TYPE}}>(num_items);";
+      code_ += "    Self { fbb, num_items }";
+      code_ += "  }";
+      code_ += "";
+      code_ += "  #[inline]";
+      code_ += "  pub fn finish(&mut self) -> flatbuffers::UnionVectorWIPOffsets<'a, {{UNION_OFFSET_TYPE}}> {";
+      code_ += "    self.fbb.end_union_vector(self.num_items)";
+      code_ += "  }";
+      code_ += "";
+      ForAllUnionVariantsBesidesNone(enum_def, [&](const EnumVal &unused) {
+        (void)unused;
+        code_ += "  #[inline]";
+        code_ += "  pub fn push_as_{{U_ELEMENT_NAME}}(&mut self, o: flatbuffers::WIPOffset<{{U_ELEMENT_TABLE_TYPE}}>) {";
+        code_ += "    self.fbb.push_union_vector_item({{ENUM_NAME}}::tag_as_{{U_ELEMENT_NAME}}(o));";
+        code_ += "  }";
+        code_ += "";
+      });
+      code_ += "}";
+      code_ += "";
+      // Generate typesafe offset(s) for unions
       code_ += "pub struct {{UNION_OFFSET_TYPE}} {}";
       code_ += "";
       GenUnionTraits(enum_def);

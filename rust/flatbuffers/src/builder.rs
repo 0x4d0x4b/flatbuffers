@@ -39,6 +39,12 @@ struct FieldLoc {
     id: VOffsetT,
 }
 
+/// Trait to mark ability of building vector
+/// using associated type
+pub trait BuildVector<'a: 'b, 'b> {
+    type VectorBuilder;
+}
+
 /// FlatBufferBuilder builds a FlatBuffer through manipulating its internal
 /// state. It has an owned `Vec<u8>` that grows as needed (up to the hardcoded
 /// limit of 2GiB, which is set by the FlatBuffers format).
@@ -56,6 +62,11 @@ pub struct FlatBufferBuilder<'fbb> {
     min_align: usize,
     force_defaults: bool,
     strings_pool: Vec<WIPOffset<&'fbb str>>,
+
+    // vector to cache union tags to be pushed
+    // when vector of union values is complete
+    pending_tags: Vec<u8>,
+    pending_tags_count: usize,
 
     _phantom: PhantomData<&'fbb ()>,
 }
@@ -92,6 +103,9 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
             force_defaults: false,
             strings_pool: Vec::new(),
 
+            pending_tags: Vec::new(),
+            pending_tags_count: 0,
+
             _phantom: PhantomData,
         }
     }
@@ -125,6 +139,9 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
 
         self.min_align = 0;
         self.strings_pool.clear();
+
+        self.pending_tags.clear();
+        self.pending_tags_count = 0;
     }
 
     /// Destroy the FlatBufferBuilder, returning its internal byte vector
@@ -147,6 +164,16 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
             x.push(dst, rest);
         }
         WIPOffset::new(self.used_space() as UOffsetT)
+    }
+
+    /// Push a `UnionWIPOffset` into a started vector.
+    #[inline]
+    pub fn push_union_vector_item<T: TaggedUnion>(&mut self, x: UnionWIPOffset<T>) {
+        self.assert_nested("push_union_vector_item");
+        self.pending_tags_count -= 1;
+        let tag_value = x.tag().into();
+        self.pending_tags[self.pending_tags_count] = tag_value;
+        self.push(x.value_offset());
     }
 
     /// Push a Push'able value onto the front of the in-progress data, and
@@ -237,6 +264,57 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
         self.nested = false;
         let o = self.push::<UOffsetT>(num_elems as UOffsetT);
         WIPOffset::new(o.value())
+    }
+
+    /// Start a union Vector write.
+    ///
+    /// Asserts that the builder is not in a nested state.
+    ///
+    /// Users who choose to create vectors manually using this
+    /// function will want to use `push_union` to add values.
+    #[inline]
+    pub fn start_union_vector<T: TaggedUnion>(&mut self, num_items: usize) {
+        self.assert_not_nested(
+            "start_union_vector can not be called when a table or vector is under construction",
+        );
+        self.nested = true;
+        assert!(self.pending_tags.is_empty(), "pending tags not empty");
+        self.pending_tags_count = num_items;
+        self.pending_tags.resize(num_items, 0);
+        self.align(
+            num_items * WIPOffset::<T>::size(),
+            WIPOffset::<T>::alignment().max_of(SIZE_UOFFSET),
+        );
+    }
+
+    /// End a union Vector write.
+    ///
+    /// Note that the `num_elems` parameter is the number of written items, not
+    /// the byte count.
+    ///
+    /// Asserts that the builder is in a nested state.
+    #[inline]
+    pub fn end_union_vector<T: TaggedUnion>(
+        &mut self,
+        num_elems: usize,
+    ) -> UnionVectorWIPOffsets<'fbb, T> {
+        self.assert_nested("end_union_vector");
+        self.nested = false;
+        assert!(
+            self.pending_tags.len() == num_elems && self.pending_tags_count == 0,
+            "not enough union values"
+        );
+        let o = self.push::<UOffsetT>(num_elems as UOffsetT);
+        let tags_len = num_elems * u8::size();
+        self.align(tags_len, u8::alignment().max_of(SIZE_UOFFSET));
+
+        let bytes = {
+            let ptr = self.pending_tags.as_ptr();
+            unsafe { from_raw_parts(ptr, tags_len) }
+        };
+        self.push_bytes_unprefixed(bytes);
+        let t = self.push::<UOffsetT>(num_elems as UOffsetT);
+        UnionVectorWIPOffsets::new(WIPOffset::new(t.value()), WIPOffset::new(o.value()))
     }
 
     #[inline]
@@ -370,8 +448,8 @@ impl<'fbb> FlatBufferBuilder<'fbb> {
         let mut tags_head = self.owned_buf.len() - tags_offsets.1.value() as usize;
 
         for i in (0..items.len()).rev() {
-            items_head = items_head - item_size;
-            tags_head = tags_head - tag_size;
+            items_head -= item_size;
+            tags_head -= tag_size;
             {
                 let (dst, rest) = (&mut self.owned_buf[items_head..]).split_at_mut(item_size);
                 items[i].value_offset().push(dst, rest);

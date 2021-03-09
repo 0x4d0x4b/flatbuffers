@@ -118,6 +118,41 @@ impl<'a> flatbuffers::Verifiable for UnionInNestedNS {
 
 impl flatbuffers::SimpleToVerifyInSlice for UnionInNestedNS {}
 
+impl From<UnionInNestedNS> for u8 {
+  #[inline]
+  fn from(v: UnionInNestedNS) -> u8 {
+    v.0
+  }
+}
+
+impl<'a: 'b, 'b> flatbuffers::BuildVector<'a, 'b> for UnionInNestedNS {
+  type VectorBuilder = UnionInNestedNSVectorBuilder<'a, 'b>;
+}
+
+pub struct UnionInNestedNSVectorBuilder<'a: 'b, 'b> {
+  fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+  num_items: usize,
+}
+
+impl<'a: 'b, 'b> UnionInNestedNSVectorBuilder<'a, 'b> {
+  #[inline]
+  pub fn new(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, num_items: usize) -> Self {
+    fbb.start_union_vector::<UnionInNestedNSUnionValue>(num_items);
+    Self { fbb, num_items }
+  }
+
+  #[inline]
+  pub fn finish(&mut self) -> flatbuffers::UnionVectorWIPOffsets<'a, UnionInNestedNSUnionValue> {
+    self.fbb.end_union_vector(self.num_items)
+  }
+
+  #[inline]
+  pub fn push_as_table_in_nested_ns(&mut self, o: flatbuffers::WIPOffset<TableInNestedNS>) {
+    self.fbb.push_union_vector_item(UnionInNestedNS::tag_as_table_in_nested_ns(o));
+  }
+
+}
+
 pub struct UnionInNestedNSUnionValue {}
 
 impl flatbuffers::TaggedUnion for UnionInNestedNSUnionValue {

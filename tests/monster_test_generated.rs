@@ -518,6 +518,51 @@ impl<'a> flatbuffers::Verifiable for Any {
 
 impl flatbuffers::SimpleToVerifyInSlice for Any {}
 
+impl From<Any> for u8 {
+  #[inline]
+  fn from(v: Any) -> u8 {
+    v.0
+  }
+}
+
+impl<'a: 'b, 'b> flatbuffers::BuildVector<'a, 'b> for Any {
+  type VectorBuilder = AnyVectorBuilder<'a, 'b>;
+}
+
+pub struct AnyVectorBuilder<'a: 'b, 'b> {
+  fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+  num_items: usize,
+}
+
+impl<'a: 'b, 'b> AnyVectorBuilder<'a, 'b> {
+  #[inline]
+  pub fn new(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, num_items: usize) -> Self {
+    fbb.start_union_vector::<AnyUnionValue>(num_items);
+    Self { fbb, num_items }
+  }
+
+  #[inline]
+  pub fn finish(&mut self) -> flatbuffers::UnionVectorWIPOffsets<'a, AnyUnionValue> {
+    self.fbb.end_union_vector(self.num_items)
+  }
+
+  #[inline]
+  pub fn push_as_monster(&mut self, o: flatbuffers::WIPOffset<Monster>) {
+    self.fbb.push_union_vector_item(Any::tag_as_monster(o));
+  }
+
+  #[inline]
+  pub fn push_as_test_simple_table_with_enum(&mut self, o: flatbuffers::WIPOffset<TestSimpleTableWithEnum>) {
+    self.fbb.push_union_vector_item(Any::tag_as_test_simple_table_with_enum(o));
+  }
+
+  #[inline]
+  pub fn push_as_my_game_example_2_monster(&mut self, o: flatbuffers::WIPOffset<super::example_2::Monster>) {
+    self.fbb.push_union_vector_item(Any::tag_as_my_game_example_2_monster(o));
+  }
+
+}
+
 pub struct AnyUnionValue {}
 
 impl flatbuffers::TaggedUnion for AnyUnionValue {
@@ -760,6 +805,51 @@ impl<'a> flatbuffers::Verifiable for AnyUniqueAliases {
 
 impl flatbuffers::SimpleToVerifyInSlice for AnyUniqueAliases {}
 
+impl From<AnyUniqueAliases> for u8 {
+  #[inline]
+  fn from(v: AnyUniqueAliases) -> u8 {
+    v.0
+  }
+}
+
+impl<'a: 'b, 'b> flatbuffers::BuildVector<'a, 'b> for AnyUniqueAliases {
+  type VectorBuilder = AnyUniqueAliasesVectorBuilder<'a, 'b>;
+}
+
+pub struct AnyUniqueAliasesVectorBuilder<'a: 'b, 'b> {
+  fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+  num_items: usize,
+}
+
+impl<'a: 'b, 'b> AnyUniqueAliasesVectorBuilder<'a, 'b> {
+  #[inline]
+  pub fn new(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, num_items: usize) -> Self {
+    fbb.start_union_vector::<AnyUniqueAliasesUnionValue>(num_items);
+    Self { fbb, num_items }
+  }
+
+  #[inline]
+  pub fn finish(&mut self) -> flatbuffers::UnionVectorWIPOffsets<'a, AnyUniqueAliasesUnionValue> {
+    self.fbb.end_union_vector(self.num_items)
+  }
+
+  #[inline]
+  pub fn push_as_m(&mut self, o: flatbuffers::WIPOffset<Monster>) {
+    self.fbb.push_union_vector_item(AnyUniqueAliases::tag_as_m(o));
+  }
+
+  #[inline]
+  pub fn push_as_ts(&mut self, o: flatbuffers::WIPOffset<TestSimpleTableWithEnum>) {
+    self.fbb.push_union_vector_item(AnyUniqueAliases::tag_as_ts(o));
+  }
+
+  #[inline]
+  pub fn push_as_m2(&mut self, o: flatbuffers::WIPOffset<super::example_2::Monster>) {
+    self.fbb.push_union_vector_item(AnyUniqueAliases::tag_as_m2(o));
+  }
+
+}
+
 pub struct AnyUniqueAliasesUnionValue {}
 
 impl flatbuffers::TaggedUnion for AnyUniqueAliasesUnionValue {
@@ -1001,6 +1091,51 @@ impl<'a> flatbuffers::Verifiable for AnyAmbiguousAliases {
 }
 
 impl flatbuffers::SimpleToVerifyInSlice for AnyAmbiguousAliases {}
+
+impl From<AnyAmbiguousAliases> for u8 {
+  #[inline]
+  fn from(v: AnyAmbiguousAliases) -> u8 {
+    v.0
+  }
+}
+
+impl<'a: 'b, 'b> flatbuffers::BuildVector<'a, 'b> for AnyAmbiguousAliases {
+  type VectorBuilder = AnyAmbiguousAliasesVectorBuilder<'a, 'b>;
+}
+
+pub struct AnyAmbiguousAliasesVectorBuilder<'a: 'b, 'b> {
+  fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+  num_items: usize,
+}
+
+impl<'a: 'b, 'b> AnyAmbiguousAliasesVectorBuilder<'a, 'b> {
+  #[inline]
+  pub fn new(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>, num_items: usize) -> Self {
+    fbb.start_union_vector::<AnyAmbiguousAliasesUnionValue>(num_items);
+    Self { fbb, num_items }
+  }
+
+  #[inline]
+  pub fn finish(&mut self) -> flatbuffers::UnionVectorWIPOffsets<'a, AnyAmbiguousAliasesUnionValue> {
+    self.fbb.end_union_vector(self.num_items)
+  }
+
+  #[inline]
+  pub fn push_as_m1(&mut self, o: flatbuffers::WIPOffset<Monster>) {
+    self.fbb.push_union_vector_item(AnyAmbiguousAliases::tag_as_m1(o));
+  }
+
+  #[inline]
+  pub fn push_as_m2(&mut self, o: flatbuffers::WIPOffset<Monster>) {
+    self.fbb.push_union_vector_item(AnyAmbiguousAliases::tag_as_m2(o));
+  }
+
+  #[inline]
+  pub fn push_as_m3(&mut self, o: flatbuffers::WIPOffset<Monster>) {
+    self.fbb.push_union_vector_item(AnyAmbiguousAliases::tag_as_m3(o));
+  }
+
+}
 
 pub struct AnyAmbiguousAliasesUnionValue {}
 
