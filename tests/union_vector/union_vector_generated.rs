@@ -949,7 +949,7 @@ impl<'a> Movie<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
-  pub fn main_character_as_other(&self) -> Option<&str> {
+  pub fn main_character_as_other(&self) -> Option<&'a str> {
     if self.main_character_type() == Character::Other {
       self.main_character().map(|t| <&str>::follow(t.buf, t.loc))
     } else {
@@ -959,12 +959,102 @@ impl<'a> Movie<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
-  pub fn main_character_as_unused(&self) -> Option<&str> {
+  pub fn main_character_as_unused(&self) -> Option<&'a str> {
     if self.main_character_type() == Character::Unused {
       self.main_character().map(|t| <&str>::follow(t.buf, t.loc))
     } else {
       None
     }
+  }
+
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn characters_item_as_mu_lan(&self, idx: usize) -> Option<Attacker<'a>> {
+    if let Some(tags) = self.characters_type() {
+      if let Some(tables) = self.characters() {
+        if let Some((tag, table)) = tags.iter().zip(tables.iter()).nth(idx) {
+          if tag == Character::MuLan {
+            return Some(<Attacker>::init_from_table(table));
+          }
+        }
+      }
+    }
+    None
+  }
+
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn characters_item_as_rapunzel(&self, idx: usize) -> Option<Rapunzel<'a>> {
+    if let Some(tags) = self.characters_type() {
+      if let Some(tables) = self.characters() {
+        if let Some((tag, table)) = tags.iter().zip(tables.iter()).nth(idx) {
+          if tag == Character::Rapunzel {
+            return Some(<Rapunzel>::init_from_table(table));
+          }
+        }
+      }
+    }
+    None
+  }
+
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn characters_item_as_belle(&self, idx: usize) -> Option<BookReader<'a>> {
+    if let Some(tags) = self.characters_type() {
+      if let Some(tables) = self.characters() {
+        if let Some((tag, table)) = tags.iter().zip(tables.iter()).nth(idx) {
+          if tag == Character::Belle {
+            return Some(<BookReader>::init_from_table(table));
+          }
+        }
+      }
+    }
+    None
+  }
+
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn characters_item_as_book_fan(&self, idx: usize) -> Option<BookReader<'a>> {
+    if let Some(tags) = self.characters_type() {
+      if let Some(tables) = self.characters() {
+        if let Some((tag, table)) = tags.iter().zip(tables.iter()).nth(idx) {
+          if tag == Character::BookFan {
+            return Some(<BookReader>::init_from_table(table));
+          }
+        }
+      }
+    }
+    None
+  }
+
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn characters_item_as_other(&self, idx: usize) -> Option<&'a str> {
+    if let Some(tags) = self.characters_type() {
+      if let Some(tables) = self.characters() {
+        if let Some((tag, table)) = tags.iter().zip(tables.iter()).nth(idx) {
+          if tag == Character::Other {
+            return Some(<&str>::follow(table.buf, table.loc));
+          }
+        }
+      }
+    }
+    None
+  }
+
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn characters_item_as_unused(&self, idx: usize) -> Option<&'a str> {
+    if let Some(tags) = self.characters_type() {
+      if let Some(tables) = self.characters() {
+        if let Some((tag, table)) = tags.iter().zip(tables.iter()).nth(idx) {
+          if tag == Character::Unused {
+            return Some(<&str>::follow(table.buf, table.loc));
+          }
+        }
+      }
+    }
+    None
   }
 
 }

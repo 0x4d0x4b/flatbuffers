@@ -1874,7 +1874,9 @@ class RustGenerator : public BaseGenerator {
             } else {
               code_.SetValue("CLOSURE", "|t| ");
               code_.SetValue("INIT_FUNCTION_CALL", "follow(t.buf, t.loc)");
-              code_.SetValue("RETURN_TYPE", code_.GetValue("U_ELEMENT_TABLE_TYPE"));
+              // replace initial '&' with "&'a "
+              code_.SetValue("RETURN_TYPE",
+                             code_.GetValue("U_ELEMENT_TABLE_TYPE").replace(0, 1, "&'a "));
             }
             code_ += "  #[inline]";
             code_ += "  #[allow(non_snake_case)]";
@@ -1913,6 +1915,40 @@ class RustGenerator : public BaseGenerator {
             code_ += "  }";
             code_ += "";
           });
+    });
+    // Explicit specializations for union vector accessors
+    ForAllTableFields(struct_def, [&](const FieldDef &field) {
+      if (field.value.type.base_type != BASE_TYPE_VECTOR ||
+          field.value.type.element != BASE_TYPE_UNION) return;
+      code_.SetValue("FIELD_TYPE_FIELD_NAME", field.name);
+      ForAllUnionVariantsBesidesNone(
+          *field.value.type.enum_def, [&](const EnumVal &ev) {
+            if (ev.union_type.base_type != BASE_TYPE_STRING) {
+              code_.SetValue("INIT_FUNCTION_CALL", "init_from_table(table)");
+              code_.SetValue("RETURN_TYPE", code_.GetValue("U_ELEMENT_TABLE_TYPE") + "<'a>");
+            } else {
+              code_.SetValue("INIT_FUNCTION_CALL", "follow(table.buf, table.loc)");
+              // replace initial '&' with "&'a "
+              code_.SetValue("RETURN_TYPE",
+                             code_.GetValue("U_ELEMENT_TABLE_TYPE").replace(0, 1, "&'a "));
+            }
+            code_ += "  #[inline]";
+            code_ += "  #[allow(non_snake_case)]";
+            code_ += "  pub fn {{FIELD_NAME}}_item_as_{{U_ELEMENT_NAME}}(&self, idx: usize) -> "
+                     "Option<{{RETURN_TYPE}}> {";
+            code_ += "    if let Some(tags) = self.{{FIELD_NAME}}_type() {";
+            code_ += "      if let Some(tables) = self.{{FIELD_NAME}}() {";
+            code_ += "        if let Some((tag, table)) = tags.iter().zip(tables.iter()).nth(idx) {";
+            code_ += "          if tag == {{U_ELEMENT_ENUM_TYPE}} {";
+            code_ += "            return Some(<{{U_ELEMENT_TABLE_TYPE}}>::{{INIT_FUNCTION_CALL}});";
+            code_ += "          }";
+            code_ += "        }";
+            code_ += "      }";
+            code_ += "    }";
+            code_ += "    None";
+            code_ += "  }";
+            code_ += "";
+      });
     });
     code_ += "}";  // End of table impl.
     code_ += "";
