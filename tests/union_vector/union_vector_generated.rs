@@ -296,9 +296,9 @@ impl CharacterT {
     match self {
       Self::NONE => None,
       Self::MuLan(v) => Some(Character::tag_as_mu_lan(v.pack(fbb)).value_offset()),
-      Self::Rapunzel(v) => Some(Character::tag_as_rapunzel(v.pack(fbb)).value_offset()),
-      Self::Belle(v) => Some(Character::tag_as_belle(v.pack(fbb)).value_offset()),
-      Self::BookFan(v) => Some(Character::tag_as_book_fan(v.pack(fbb)).value_offset()),
+      Self::Rapunzel(v) => Some(Character::tag_as_rapunzel(fbb.push(v.pack())).value_offset()),
+      Self::Belle(v) => Some(Character::tag_as_belle(fbb.push(v.pack())).value_offset()),
+      Self::BookFan(v) => Some(Character::tag_as_book_fan(fbb.push(v.pack())).value_offset()),
       Self::Other(v) => Some(Character::tag_as_other(fbb.create_string(v.as_str())).value_offset()),
       Self::Unused(v) => Some(Character::tag_as_unused(fbb.create_string(v.as_str())).value_offset()),
     }
@@ -868,11 +868,11 @@ impl<'a> Movie<'a> {
                 &Character::MuLan => CharacterT::MuLan(Box::new(
                     <Attacker>::init_from_table(table).unpack())),
                 &Character::Rapunzel => CharacterT::Rapunzel(Box::new(
-                    <Rapunzel>::init_from_table(table).unpack())),
+                    <Rapunzel>::follow(table.buf, table.loc).unpack())),
                 &Character::Belle => CharacterT::Belle(Box::new(
-                    <BookReader>::init_from_table(table).unpack())),
+                    <BookReader>::follow(table.buf, table.loc).unpack())),
                 &Character::BookFan => CharacterT::BookFan(Box::new(
-                    <BookReader>::init_from_table(table).unpack())),
+                    <BookReader>::follow(table.buf, table.loc).unpack())),
                 &Character::Other => CharacterT::Other(Box::new(
                     <&str>::follow(table.buf, table.loc).to_string())),
                 &Character::Unused => CharacterT::Unused(Box::new(
@@ -919,9 +919,9 @@ impl<'a> Movie<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
-  pub fn main_character_as_rapunzel(&self) -> Option<Rapunzel<'a>> {
+  pub fn main_character_as_rapunzel(&self) -> Option<&'a Rapunzel> {
     if self.main_character_type() == Character::Rapunzel {
-      self.main_character().map(<Rapunzel>::init_from_table)
+      self.main_character().map(|t| <Rapunzel>::follow(t.buf, t.loc))
     } else {
       None
     }
@@ -929,9 +929,9 @@ impl<'a> Movie<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
-  pub fn main_character_as_belle(&self) -> Option<BookReader<'a>> {
+  pub fn main_character_as_belle(&self) -> Option<&'a BookReader> {
     if self.main_character_type() == Character::Belle {
-      self.main_character().map(<BookReader>::init_from_table)
+      self.main_character().map(|t| <BookReader>::follow(t.buf, t.loc))
     } else {
       None
     }
@@ -939,9 +939,9 @@ impl<'a> Movie<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
-  pub fn main_character_as_book_fan(&self) -> Option<BookReader<'a>> {
+  pub fn main_character_as_book_fan(&self) -> Option<&'a BookReader> {
     if self.main_character_type() == Character::BookFan {
-      self.main_character().map(<BookReader>::init_from_table)
+      self.main_character().map(|t| <BookReader>::follow(t.buf, t.loc))
     } else {
       None
     }
@@ -984,12 +984,12 @@ impl<'a> Movie<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
-  pub fn characters_item_as_rapunzel(&self, idx: usize) -> Option<Rapunzel<'a>> {
+  pub fn characters_item_as_rapunzel(&self, idx: usize) -> Option<&'a Rapunzel> {
     if let Some(tags) = self.characters_type() {
       if let Some(tables) = self.characters() {
         if let Some((tag, table)) = tags.iter().zip(tables.iter()).nth(idx) {
           if tag == Character::Rapunzel {
-            return Some(<Rapunzel>::init_from_table(table));
+            return Some(<Rapunzel>::follow(table.buf, table.loc));
           }
         }
       }
@@ -999,12 +999,12 @@ impl<'a> Movie<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
-  pub fn characters_item_as_belle(&self, idx: usize) -> Option<BookReader<'a>> {
+  pub fn characters_item_as_belle(&self, idx: usize) -> Option<&'a BookReader> {
     if let Some(tags) = self.characters_type() {
       if let Some(tables) = self.characters() {
         if let Some((tag, table)) = tags.iter().zip(tables.iter()).nth(idx) {
           if tag == Character::Belle {
-            return Some(<BookReader>::init_from_table(table));
+            return Some(<BookReader>::follow(table.buf, table.loc));
           }
         }
       }
@@ -1014,12 +1014,12 @@ impl<'a> Movie<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
-  pub fn characters_item_as_book_fan(&self, idx: usize) -> Option<BookReader<'a>> {
+  pub fn characters_item_as_book_fan(&self, idx: usize) -> Option<&'a BookReader> {
     if let Some(tags) = self.characters_type() {
       if let Some(tables) = self.characters() {
         if let Some((tag, table)) = tags.iter().zip(tables.iter()).nth(idx) {
           if tag == Character::BookFan {
-            return Some(<BookReader>::init_from_table(table));
+            return Some(<BookReader>::follow(table.buf, table.loc));
           }
         }
       }

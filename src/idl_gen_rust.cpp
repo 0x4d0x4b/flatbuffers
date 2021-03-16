@@ -853,16 +853,16 @@ class RustGenerator : public BaseGenerator {
       code_.SetValue("VARIANT_NAME", Name(enum_val));
       code_.SetValue("NATIVE_VARIANT", MakeCamel(Name(enum_val)));
       code_.SetValue("U_ELEMENT_NAME", MakeSnakeCase(Name(enum_val)));
-      if (enum_val.union_type.base_type != BASE_TYPE_STRING) {
+      if (IsString(enum_val.union_type)) {
+        code_.SetValue("NATIVE_U_ELEMENT_TYPE", "std::string::String");
+        code_.SetValue("U_ELEMENT_TABLE_TYPE", "&str");
+      } else {
         code_.SetValue("NATIVE_U_ELEMENT_TYPE",
             NamespacedNativeName(*enum_val.union_type.struct_def));
         code_.SetValue(
             "U_ELEMENT_TABLE_TYPE",
             WrapInNameSpace(enum_val.union_type.struct_def->defined_namespace,
                             enum_val.union_type.struct_def->name));
-      } else {
-        code_.SetValue("NATIVE_U_ELEMENT_TYPE", "std::string::String");
-        code_.SetValue("U_ELEMENT_TABLE_TYPE", "&str");
       }
       cb(enum_val);
     }
@@ -939,10 +939,12 @@ class RustGenerator : public BaseGenerator {
     code_ += "    match self {";
     code_ += "      Self::NONE => None,";
     ForAllUnionObjectVariantsBesidesNone(enum_def, [&](const EnumVal &ev) {
-      if (ev.union_type.base_type != BASE_TYPE_STRING) {
-        code_.SetValue("PACK_FUNCTION_CALL", "v.pack(fbb)");
-      } else {
+      if (IsString(ev.union_type)) {
         code_.SetValue("PACK_FUNCTION_CALL", "fbb.create_string(v.as_str())");
+      } else if (IsStruct(ev.union_type)) {
+        code_.SetValue("PACK_FUNCTION_CALL", "fbb.push(v.pack())");
+      } else {
+        code_.SetValue("PACK_FUNCTION_CALL", "v.pack(fbb)");
       }
       code_ +=
           "      Self::{{NATIVE_VARIANT}}(v) => "
@@ -1529,13 +1531,13 @@ class RustGenerator : public BaseGenerator {
           "U_ELEMENT_ENUM_TYPE",
           WrapInNameSpace(def.defined_namespace, GetEnumValue(def, ev)));
       code_.SetValue("U_ELEMENT_NAME", MakeSnakeCase(Name(ev)));
-      if (ev.union_type.base_type != BASE_TYPE_STRING) {
-          code_.SetValue(
-              "U_ELEMENT_TABLE_TYPE",
-              WrapInNameSpace(ev.union_type.struct_def->defined_namespace,
-                              ev.union_type.struct_def->name));
+      if (IsString(ev.union_type)) {
+        code_.SetValue("U_ELEMENT_TABLE_TYPE", "&str");
       } else {
-          code_.SetValue("U_ELEMENT_TABLE_TYPE", "&str");
+        code_.SetValue(
+            "U_ELEMENT_TABLE_TYPE",
+            WrapInNameSpace(ev.union_type.struct_def->defined_namespace,
+                            ev.union_type.struct_def->name));
       }
       cb(ev);
     }
@@ -1665,10 +1667,10 @@ class RustGenerator : public BaseGenerator {
                 "        {{ENUM_NAME}}::NONE =>"
                 " {{NATIVE_ENUM_NAME}}::NONE,";
             ForAllUnionObjectVariantsBesidesNone(enum_def, [&](const EnumVal &ev) {
-              if (ev.union_type.base_type != BASE_TYPE_STRING) {
-                code_.SetValue("UNPACK_FUNCTION", "unpack()");
-              } else {
+              if (IsString(ev.union_type)) {
                 code_.SetValue("UNPACK_FUNCTION", "to_string()");
+              } else {
+                code_.SetValue("UNPACK_FUNCTION", "unpack()");
               }
               code_ +=
                   "        {{ENUM_NAME}}::{{VARIANT_NAME}} => "
@@ -1752,10 +1754,12 @@ class RustGenerator : public BaseGenerator {
             code_ +=
                 "                &{{ENUM_NAME}}::NONE => {{NATIVE_ENUM_NAME}}::NONE,";
             ForAllUnionObjectVariantsBesidesNone(enum_def, [&](const EnumVal &ev) {
-              if (ev.union_type.base_type != BASE_TYPE_STRING) {
-                code_.SetValue("UNPACK_FUNCTION_CALL", "init_from_table(table).unpack()");
-              } else {
+              if (IsString(ev.union_type)) {
                 code_.SetValue("UNPACK_FUNCTION_CALL", "follow(table.buf, table.loc).to_string()");
+              } else if (IsStruct(ev.union_type)) {
+                code_.SetValue("UNPACK_FUNCTION_CALL", "follow(table.buf, table.loc).unpack()");
+              } else {
+                code_.SetValue("UNPACK_FUNCTION_CALL", "init_from_table(table).unpack()");
               }
               code_ +=
                   "                &{{ENUM_NAME}}::{{VARIANT_NAME}} => "
@@ -1867,16 +1871,21 @@ class RustGenerator : public BaseGenerator {
       code_.SetValue("FIELD_TYPE_FIELD_NAME", field.name);
       ForAllUnionVariantsBesidesNone(
           *field.value.type.enum_def, [&](const EnumVal &ev) {
-            if (ev.union_type.base_type != BASE_TYPE_STRING) {
-              code_.SetValue("CLOSURE", "");
-              code_.SetValue("INIT_FUNCTION_CALL", "init_from_table");
-              code_.SetValue("RETURN_TYPE", code_.GetValue("U_ELEMENT_TABLE_TYPE") + "<'a>");
-            } else {
+            if (IsString(ev.union_type)) {
               code_.SetValue("CLOSURE", "|t| ");
               code_.SetValue("INIT_FUNCTION_CALL", "follow(t.buf, t.loc)");
               // replace initial '&' with "&'a "
               code_.SetValue("RETURN_TYPE",
                              code_.GetValue("U_ELEMENT_TABLE_TYPE").replace(0, 1, "&'a "));
+            } else if (IsStruct(ev.union_type)) {
+              code_.SetValue("CLOSURE", "|t| ");
+              code_.SetValue("INIT_FUNCTION_CALL", "follow(t.buf, t.loc)");
+              code_.SetValue("RETURN_TYPE",
+                             "&'a " + code_.GetValue("U_ELEMENT_TABLE_TYPE"));
+            } else {
+              code_.SetValue("CLOSURE", "");
+              code_.SetValue("INIT_FUNCTION_CALL", "init_from_table");
+              code_.SetValue("RETURN_TYPE", code_.GetValue("U_ELEMENT_TABLE_TYPE") + "<'a>");
             }
             code_ += "  #[inline]";
             code_ += "  #[allow(non_snake_case)]";
@@ -1923,14 +1932,18 @@ class RustGenerator : public BaseGenerator {
       code_.SetValue("FIELD_TYPE_FIELD_NAME", field.name);
       ForAllUnionVariantsBesidesNone(
           *field.value.type.enum_def, [&](const EnumVal &ev) {
-            if (ev.union_type.base_type != BASE_TYPE_STRING) {
-              code_.SetValue("INIT_FUNCTION_CALL", "init_from_table(table)");
-              code_.SetValue("RETURN_TYPE", code_.GetValue("U_ELEMENT_TABLE_TYPE") + "<'a>");
-            } else {
+            if (IsString(ev.union_type)) {
               code_.SetValue("INIT_FUNCTION_CALL", "follow(table.buf, table.loc)");
               // replace initial '&' with "&'a "
               code_.SetValue("RETURN_TYPE",
                              code_.GetValue("U_ELEMENT_TABLE_TYPE").replace(0, 1, "&'a "));
+            } else if (IsStruct(ev.union_type)) {
+              code_.SetValue("INIT_FUNCTION_CALL", "follow(table.buf, table.loc)");
+              code_.SetValue("RETURN_TYPE",
+                             "&'a " + code_.GetValue("U_ELEMENT_TABLE_TYPE"));
+            } else {
+              code_.SetValue("INIT_FUNCTION_CALL", "init_from_table(table)");
+              code_.SetValue("RETURN_TYPE", code_.GetValue("U_ELEMENT_TABLE_TYPE") + "<'a>");
             }
             code_ += "  #[inline]";
             code_ += "  #[allow(non_snake_case)]";
